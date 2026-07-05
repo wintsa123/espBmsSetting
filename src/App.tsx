@@ -52,6 +52,7 @@ const I18N = {
     apPassword: "设置热点密码",
     battery: "电池",
     bindBms: "绑定 BMS",
+    bleControlUnavailable: "固件未开启蓝牙控制服务",
     bluetoothUnsupported: "当前浏览器不支持 Web Bluetooth",
     bms: "BMS",
     brightness: "亮度",
@@ -102,6 +103,7 @@ const I18N = {
     apPassword: "Setup AP password",
     battery: "Battery",
     bindBms: "Bind BMS",
+    bleControlUnavailable: "Firmware BLE control service is not enabled",
     bluetoothUnsupported: "Web Bluetooth is not supported",
     bms: "BMS",
     brightness: "Brightness",
@@ -376,9 +378,15 @@ export default function App() {
       });
       const server = await device.gatt?.connect();
       if (!server) throw new Error(t("disconnected"));
-      const service = await server.getPrimaryService(CONTROL_SERVICE_UUID);
-      const tx = await service.getCharacteristic(CONTROL_TX_UUID);
-      const rx = await service.getCharacteristic(CONTROL_RX_UUID);
+      let tx: BluetoothRemoteGATTCharacteristic;
+      let rx: BluetoothRemoteGATTCharacteristic;
+      try {
+        const service = await server.getPrimaryService(CONTROL_SERVICE_UUID);
+        tx = await service.getCharacteristic(CONTROL_TX_UUID);
+        rx = await service.getCharacteristic(CONTROL_RX_UUID);
+      } catch {
+        throw new Error(t("bleControlUnavailable"));
+      }
       await rx.startNotifications();
       rx.addEventListener("characteristicvaluechanged", onBleValue);
       device.addEventListener("gattserverdisconnected", () => {
@@ -472,6 +480,15 @@ export default function App() {
           <span>{t("wifi")}</span>
           <strong>{formatState(status.wifi, t)}</strong>
         </div>
+      </section>
+
+      <section className="quick-actions">
+        <button type="button" disabled={busy} onClick={() => void connectHttp()}>
+          {t("connectHttp")}
+        </button>
+        <button className="secondary" type="button" disabled={busy} onClick={() => void connectBle()}>
+          {t("connectBle")}
+        </button>
       </section>
 
       <section className={tab === "overview" ? "panel active" : "panel"}>

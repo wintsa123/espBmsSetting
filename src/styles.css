@@ -124,6 +124,13 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
 .panel {
   display: none;
   gap: 10px;
