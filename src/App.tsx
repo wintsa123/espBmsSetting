@@ -22,11 +22,12 @@ type Status = {
 
 type Config = {
   brightness?: number;
+  volume?: number;
   display_rotation?: string;
   speed_unit?: string;
   language?: Language;
-  external_ssid?: string;
   bms_mac?: string | null;
+  bms_type?: "ant" | "jk" | "jbd" | "daly";
 };
 
 type BmsCandidate = {
@@ -55,7 +56,9 @@ const I18N = {
     bleControlUnavailable: "固件未开启蓝牙控制服务",
     bluetoothUnsupported: "当前浏览器不支持 Web Bluetooth",
     bms: "BMS",
+    bmsType: "保护板类型",
     brightness: "亮度",
+    volume: "音量",
     checkUpdate: "检查更新",
     connectBle: "蓝牙",
     connectHttp: "热点 API",
@@ -80,7 +83,6 @@ const I18N = {
     readyToReboot: "待重启",
     saved: "已保存",
     saveDevice: "保存设备",
-    saveWifi: "保存 Wi-Fi",
     scanBms: "扫描 BMS",
     screenRotation: "屏幕方向",
     setupAp: "设置热点",
@@ -91,8 +93,6 @@ const I18N = {
     updateAvailable: "有更新",
     verifying: "校验中",
     wifi: "Wi-Fi",
-    wifiPassword: "外部 Wi-Fi 密码",
-    wifiSsid: "外部 Wi-Fi SSID",
   },
   en: {
     apPassword: "Setup AP password",
@@ -101,7 +101,9 @@ const I18N = {
     bleControlUnavailable: "Firmware BLE control service is not enabled",
     bluetoothUnsupported: "Web Bluetooth is not supported",
     bms: "BMS",
+    bmsType: "BMS type",
     brightness: "Brightness",
+    volume: "Volume",
     checkUpdate: "Check update",
     connectBle: "Bluetooth",
     connectHttp: "Hotspot API",
@@ -126,7 +128,6 @@ const I18N = {
     readyToReboot: "ready to reboot",
     saved: "Saved",
     saveDevice: "Save device",
-    saveWifi: "Save Wi-Fi",
     scanBms: "Scan BMS",
     screenRotation: "Screen rotation",
     setupAp: "Setup AP",
@@ -137,8 +138,6 @@ const I18N = {
     updateAvailable: "update available",
     verifying: "verifying",
     wifi: "Wi-Fi",
-    wifiPassword: "External Wi-Fi password",
-    wifiSsid: "External Wi-Fi SSID",
   },
 } satisfies Record<Language, Record<string, string>>;
 
@@ -163,13 +162,38 @@ const STATE_LABELS: Record<string, keyof typeof I18N.zh> = {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+function CastLanding() {
+  const deepLink = `fuckingbms://cast/v1${window.location.search}`;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { window.location.href = deepLink; }, 150);
+    return () => window.clearTimeout(timer);
+  }, [deepLink]);
+
+  return (
+    <main className="cast-landing">
+      <p className="eyebrow">BMS REMOTE CAST</p>
+      <h1>正在打开投屏 App…</h1>
+      <p>已安装 BMS 投屏 App 时将自动打开。请确认手机已连接设备热点。</p>
+      <a className="cast-open" href={deepLink}>打开 BMS 投屏 App</a>
+      <p className="cast-help">若未安装 App，请安装 APK 后重新扫码。</p>
+    </main>
+  );
+}
+
 export default function App() {
+  if (window.location.pathname === "/cast") return <CastLanding />;
   const [language, setLanguage] = useState<Language>("zh");
   const [transport, setTransport] = useState<Transport>("http");
   const [tab, setTab] = useState<Tab>("overview");
   const [baseUrl, setBaseUrl] = useState("http://192.168.4.1");
   const [status, setStatus] = useState<Status>({});
-  const [config, setConfig] = useState<Config>({ language: "zh", display_rotation: "landscape", speed_unit: "km/h" });
+  const [config, setConfig] = useState<Config>({
+    language: "zh",
+    display_rotation: "landscape",
+    speed_unit: "km/h",
+    bms_type: "ant",
+  });
   const [candidates, setCandidates] = useState<BmsCandidate[]>([]);
   const [message, setMessage] = useState("未连接");
   const [busy, setBusy] = useState(false);
@@ -364,11 +388,12 @@ export default function App() {
     const data = (await api("/api/config")) as Config;
     setConfig({
       brightness: data.brightness ?? 80,
+      volume: data.volume ?? 60,
       display_rotation: data.display_rotation ?? "landscape",
       speed_unit: data.speed_unit ?? "km/h",
       language: data.language ?? "zh",
-      external_ssid: data.external_ssid ?? "",
       bms_mac: data.bms_mac ?? "",
+      bms_type: data.bms_type ?? "ant",
     });
     setLanguage(data.language === "en" ? "en" : "zh");
   }
@@ -381,15 +406,6 @@ export default function App() {
   async function post(path: string, body?: JsonRecord) {
     await api(path, { method: "POST", body: body ? JSON.stringify(body) : "" });
   }
-
-  const submitWifi = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const body = Object.fromEntries(new FormData(event.currentTarget)) as JsonRecord;
-    void run(t("saved"), async () => {
-      await post("/api/wifi", body);
-      await refresh();
-    });
-  };
 
   const submitApPassword = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -467,20 +483,6 @@ export default function App() {
           </div>
         </div>
 
-        <form className="stack" onSubmit={submitWifi}>
-          <label>
-            <span>{t("wifiSsid")}</span>
-            <input name="ssid" maxLength={32} defaultValue={config.external_ssid || ""} autoComplete="off" />
-          </label>
-          <label>
-            <span>{t("wifiPassword")}</span>
-            <input name="password" type="password" maxLength={64} autoComplete="new-password" />
-          </label>
-          <button type="submit" disabled={busy}>
-            {t("saveWifi")}
-          </button>
-        </form>
-
         <form className="stack" onSubmit={submitApPassword}>
           <label>
             <span>{t("apPassword")}</span>
@@ -503,6 +505,17 @@ export default function App() {
               max={100}
               value={config.brightness ?? 80}
               onChange={(event) => setConfig({ ...config, brightness: Number(event.target.value) })}
+            />
+          </label>
+          <label>
+            <span>{t("volume")}: {config.volume ?? 60}%</span>
+            <input
+              name="volume"
+              type="range"
+              min={0}
+              max={100}
+              value={config.volume ?? 60}
+              onChange={(event) => setConfig({ ...config, volume: Number(event.target.value) })}
             />
           </label>
           <label>
@@ -539,6 +552,15 @@ export default function App() {
           <label>
             <span>BMS MAC</span>
             <input name="bms_mac" value={config.bms_mac || ""} placeholder="AA:BB:CC:DD:EE:FF" onChange={(event) => setConfig({ ...config, bms_mac: event.target.value })} />
+          </label>
+          <label>
+            <span>{t("bmsType")}</span>
+            <select name="bms_type" value={config.bms_type || "ant"} onChange={(event) => setConfig({ ...config, bms_type: event.target.value as Config["bms_type"] })}>
+              <option value="ant">蚂蚁 ANT</option>
+              <option value="jk">极空 JK</option>
+              <option value="jbd">嘉佰达 JBD</option>
+              <option value="daly">达锂 Daly</option>
+            </select>
           </label>
           <div className="button-row">
             <button type="button" disabled={busy} onClick={() => void run(t("scanBms"), async () => { await post("/api/bms/scan"); await loadBmsCandidates(); })}>
