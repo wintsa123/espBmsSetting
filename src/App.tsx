@@ -57,7 +57,6 @@ const I18N = {
     bms: "BMS",
     brightness: "亮度",
     checkUpdate: "检查更新",
-    clearPassword: "清除密码",
     connectBle: "蓝牙",
     connectHttp: "热点 API",
     connected: "已连接",
@@ -77,10 +76,6 @@ const I18N = {
     offline: "离线",
     online: "在线",
     overview: "概览",
-    passwordCanceled: "已取消密码输入",
-    passwordCleared: "密码已清除",
-    passwordPrompt: "输入 ESP32 设置密码",
-    passwordWrong: "密码错误",
     refresh: "刷新",
     readyToReboot: "待重启",
     saved: "已保存",
@@ -108,7 +103,6 @@ const I18N = {
     bms: "BMS",
     brightness: "Brightness",
     checkUpdate: "Check update",
-    clearPassword: "Clear password",
     connectBle: "Bluetooth",
     connectHttp: "Hotspot API",
     connected: "connected",
@@ -128,10 +122,6 @@ const I18N = {
     offline: "offline",
     online: "online",
     overview: "Overview",
-    passwordCanceled: "Password entry canceled",
-    passwordCleared: "Password cleared",
-    passwordPrompt: "Enter ESP32 setup password",
-    passwordWrong: "Wrong password",
     refresh: "Refresh",
     readyToReboot: "ready to reboot",
     saved: "Saved",
@@ -178,7 +168,6 @@ export default function App() {
   const [transport, setTransport] = useState<Transport>("http");
   const [tab, setTab] = useState<Tab>("overview");
   const [baseUrl, setBaseUrl] = useState("http://192.168.4.1");
-  const [setupPassword, setSetupPassword] = useState(() => sessionStorage.getItem("setupPassword") || "");
   const [status, setStatus] = useState<Status>({});
   const [config, setConfig] = useState<Config>({ language: "zh", display_rotation: "landscape", speed_unit: "km/h" });
   const [candidates, setCandidates] = useState<BmsCandidate[]>([]);
@@ -198,11 +187,6 @@ export default function App() {
     document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
   }, [language]);
 
-  function rememberPassword(password: string) {
-    setSetupPassword(password);
-    sessionStorage.setItem("setupPassword", password);
-  }
-
   function setCurrentTransport(next: Transport) {
     transportRef.current = next;
     setTransport(next);
@@ -211,22 +195,6 @@ export default function App() {
   function setCurrentBle(next: BleState) {
     bleRef.current = next;
     setBle(next);
-  }
-
-  function requirePassword(force = false) {
-    let password = setupPassword;
-    if (force || !password) {
-      password = window.prompt(t("passwordPrompt"), password) || "";
-    }
-    if (!password) throw new Error(t("passwordCanceled"));
-    rememberPassword(password);
-    return password;
-  }
-
-  function clearPassword() {
-    sessionStorage.removeItem("setupPassword");
-    setSetupPassword("");
-    setMessage(t("passwordCleared"));
   }
 
   async function run(label: string, work: () => Promise<void>) {
@@ -249,11 +217,8 @@ export default function App() {
     return httpApi(path, options);
   }
 
-  async function httpApi(path: string, options: RequestInit = {}, retryAuth = true): Promise<unknown> {
+  async function httpApi(path: string, options: RequestInit = {}): Promise<unknown> {
     const headers = new Headers(options.headers || {});
-    const password = requirePassword();
-    headers.set("X-Setup-Password", password);
-    headers.set("Authorization", `Basic ${btoa(`esp32:${password}`)}`);
     if (options.body && !headers.has("content-type")) headers.set("content-type", "application/json");
 
     const response = await fetchLocalDevice(normalizeBaseUrl(baseUrl) + path, {
@@ -262,15 +227,6 @@ export default function App() {
       mode: "cors",
       cache: "no-store",
     });
-    if (response.status === 401) {
-      sessionStorage.removeItem("setupPassword");
-      setSetupPassword("");
-      if (retryAuth) {
-        requirePassword(true);
-        return httpApi(path, options, false);
-      }
-      throw new Error(t("passwordWrong"));
-    }
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     return response.headers.get("content-type")?.includes("application/json") ? response.json() : response.text();
   }
@@ -296,7 +252,6 @@ export default function App() {
       id,
       method: options.method || "GET",
       path,
-      setup_password: requirePassword(),
       body: options.body ? String(options.body) : "",
     };
     const promise = new Promise((resolve, reject) => {
@@ -363,7 +318,6 @@ export default function App() {
   async function connectHttp() {
     await run(t("httpConnected"), async () => {
       setCurrentTransport("http");
-      requirePassword();
       await loadConfig();
       await refresh();
     });
@@ -442,7 +396,6 @@ export default function App() {
     const body = Object.fromEntries(new FormData(event.currentTarget)) as { password?: string };
     void run(t("saved"), async () => {
       await post("/api/ap-password", body);
-      if (body.password) rememberPassword(body.password);
     });
   };
 
@@ -512,9 +465,6 @@ export default function App() {
               {t("connectBle")}
             </button>
           </div>
-          <button className="quiet" type="button" onClick={clearPassword}>
-            {t("clearPassword")}
-          </button>
         </div>
 
         <form className="stack" onSubmit={submitWifi}>
