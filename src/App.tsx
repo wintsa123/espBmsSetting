@@ -164,6 +164,7 @@ const decoder = new TextDecoder();
 
 function CastLanding() {
   const deepLink = `fuckingbms://cast/v1${window.location.search}`;
+  const [english, setEnglish] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { window.location.href = deepLink; }, 150);
@@ -172,11 +173,12 @@ function CastLanding() {
 
   return (
     <main className="cast-landing">
-      <p className="eyebrow">BMS REMOTE CAST</p>
-      <h1>正在打开投屏 App…</h1>
-      <p>已安装 BMS 投屏 App 时将自动打开。请确认手机已连接设备热点。</p>
-      <a className="cast-open" href={deepLink}>打开 BMS 投屏 App</a>
-      <p className="cast-help">若未安装 App，请安装 APK 后重新扫码。</p>
+      <button className="cast-language" onClick={() => setEnglish(!english)}>{english ? "中文" : "English"}</button>
+      <p className="eyebrow">{english ? "BMS REMOTE CAST" : "BMS 远程投屏"}</p>
+      <h1>{english ? "Opening the casting app…" : "正在打开投屏 App…"}</h1>
+      <p>{english ? "The BMS casting app opens automatically when installed. Make sure the phone is connected to the device hotspot." : "已安装 BMS 投屏 App 时将自动打开。请确认手机已连接设备热点。"}</p>
+      <a className="cast-open" href={deepLink}>{english ? "Open BMS Casting App" : "打开 BMS 投屏 App"}</a>
+      <p className="cast-help">{english ? "If the app is not installed, install the APK and scan again." : "若未安装 App，请安装 APK 后重新扫码。"}</p>
     </main>
   );
 }
