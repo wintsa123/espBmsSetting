@@ -59,7 +59,6 @@ const I18N = {
     bmsType: "保护板类型",
     brightness: "亮度",
     volume: "音量",
-    checkUpdate: "检查更新",
     connectBle: "蓝牙",
     connectHttp: "热点 API",
     connected: "已连接",
@@ -71,6 +70,8 @@ const I18N = {
     downloading: "下载中",
     failed: "失败",
     firmware: "固件",
+    firmwareCode: "固件验证码",
+    firmwareFile: "固件文件",
     httpConnected: "热点 API 已连接",
     idle: "空闲",
     language: "语言",
@@ -78,6 +79,16 @@ const I18N = {
     noCandidates: "暂无候选设备",
     offline: "离线",
     online: "在线",
+    otaCodeMismatch: "固件验证码不匹配",
+    otaFailed: "固件更新失败",
+    otaHttpOnly: "OTA 需要先连接热点 API",
+    otaInvalidCode: "请输入四位数字验证码",
+    otaInvalidImage: "固件格式无效",
+    otaPurpose: "选择应用固件并输入随固件生成的四位验证码。",
+    otaRebooting: "校验通过，设备正在重启",
+    otaSelectFile: "请选择固件文件",
+    otaTooLarge: "固件超过 OTA 分区容量",
+    otaUploading: "固件上传中，请勿断开连接",
     overview: "概览",
     refresh: "刷新",
     readyToReboot: "待重启",
@@ -88,9 +99,9 @@ const I18N = {
     setupAp: "设置热点",
     speed: "速度",
     speedUnit: "速度单位",
-    startUpdate: "开始更新",
     update: "更新",
     updateAvailable: "有更新",
+    uploadFirmware: "上传并更新",
     verifying: "校验中",
     wifi: "Wi-Fi",
   },
@@ -104,7 +115,6 @@ const I18N = {
     bmsType: "BMS type",
     brightness: "Brightness",
     volume: "Volume",
-    checkUpdate: "Check update",
     connectBle: "Bluetooth",
     connectHttp: "Hotspot API",
     connected: "connected",
@@ -116,6 +126,8 @@ const I18N = {
     downloading: "downloading",
     failed: "failed",
     firmware: "Firmware",
+    firmwareCode: "Firmware code",
+    firmwareFile: "Firmware file",
     httpConnected: "Hotspot API connected",
     idle: "idle",
     language: "Language",
@@ -123,6 +135,16 @@ const I18N = {
     noCandidates: "No candidates",
     offline: "offline",
     online: "online",
+    otaCodeMismatch: "Firmware code does not match",
+    otaFailed: "Firmware update failed",
+    otaHttpOnly: "Connect through the hotspot API before OTA",
+    otaInvalidCode: "Enter the four-digit firmware code",
+    otaInvalidImage: "Invalid firmware image",
+    otaPurpose: "Select an app image and enter its generated four-digit code.",
+    otaRebooting: "Verified; the device is restarting",
+    otaSelectFile: "Select a firmware file",
+    otaTooLarge: "Firmware exceeds the OTA partition size",
+    otaUploading: "Uploading firmware; keep the connection open",
     overview: "Overview",
     refresh: "Refresh",
     readyToReboot: "ready to reboot",
@@ -133,9 +155,9 @@ const I18N = {
     setupAp: "Setup AP",
     speed: "Speed",
     speedUnit: "Speed unit",
-    startUpdate: "Start update",
     update: "Update",
     updateAvailable: "update available",
+    uploadFirmware: "Upload and update",
     verifying: "verifying",
     wifi: "Wi-Fi",
   },
@@ -197,6 +219,8 @@ export default function App() {
     bms_type: "ant",
   });
   const [candidates, setCandidates] = useState<BmsCandidate[]>([]);
+  const [firmwareFile, setFirmwareFile] = useState<File>();
+  const [firmwareCode, setFirmwareCode] = useState("");
   const [message, setMessage] = useState("未连接");
   const [busy, setBusy] = useState(false);
   const [ble, setBle] = useState<BleState>({});
@@ -427,6 +451,38 @@ export default function App() {
     });
   };
 
+  const submitFirmware = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (transportRef.current !== "http") {
+      setMessage(t("otaHttpOnly"));
+      return;
+    }
+    if (!firmwareFile) {
+      setMessage(t("otaSelectFile"));
+      return;
+    }
+    if (!/^[0-9]{4}$/.test(firmwareCode)) {
+      setMessage(t("otaInvalidCode"));
+      return;
+    }
+
+    void run(t("otaRebooting"), async () => {
+      setMessage(t("otaUploading"));
+      const response = await fetch(normalizeBaseUrl(baseUrl) + "/api/ota", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Firmware-Code": firmwareCode,
+        },
+        body: firmwareFile,
+        mode: "cors",
+        cache: "no-store",
+        targetAddressSpace: "local",
+      } as RequestInit);
+      if (!response.ok) throw new Error(otaError(response.status, t));
+    });
+  };
+
   const battery = formatMillivolts(status.local_battery_mv ?? status.pack_voltage_mv);
   const connection = transport === "ble" ? `BLE ${ble.deviceName || ""}`.trim() : normalizeBaseUrl(baseUrl);
 
@@ -580,15 +636,39 @@ export default function App() {
       </section>
 
       <section className={tab === "update" ? "panel active" : "panel"}>
-        <div className="stack">
+        <form className="stack" onSubmit={submitFirmware}>
           <Metric label="OTA" value={formatState(status.ota, t)} />
-          <button type="button" disabled={busy} onClick={() => void run(t("checkUpdate"), async () => { await post("/api/ota/check"); await refresh(); })}>
-            {t("checkUpdate")}
+          <p className="empty">{t("otaPurpose")}</p>
+          <label>
+            <span>{t("firmwareFile")}</span>
+            <input
+              type="file"
+              accept=".bin,application/octet-stream"
+              required
+              onChange={(event) => {
+                setFirmwareFile(event.target.files?.[0]);
+                setFirmwareCode("");
+              }}
+            />
+          </label>
+          <label>
+            <span>{t("firmwareCode")}</span>
+            <input
+              value={firmwareCode}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              minLength={4}
+              maxLength={4}
+              pattern="[0-9]{4}"
+              required
+              onChange={(event) => setFirmwareCode(event.target.value.replace(/\D/g, "").slice(0, 4))}
+            />
+          </label>
+          {transport !== "http" && <p className="empty">{t("otaHttpOnly")}</p>}
+          <button type="submit" disabled={busy || transport !== "http" || !firmwareFile || !/^[0-9]{4}$/.test(firmwareCode)}>
+            {t("uploadFirmware")}
           </button>
-          <button className="secondary" type="button" disabled={busy} onClick={() => void run(t("startUpdate"), async () => { await post("/api/ota/start"); await refresh(); })}>
-            {t("startUpdate")}
-          </button>
-        </div>
+        </form>
       </section>
 
       <p className="message">{busy ? "..." : message}</p>
@@ -601,6 +681,13 @@ export default function App() {
       </nav>
     </main>
   );
+}
+
+function otaError(status: number, t: (key: keyof typeof I18N.zh) => string) {
+  if (status === 403) return t("otaCodeMismatch");
+  if (status === 413) return t("otaTooLarge");
+  if (status === 422) return t("otaInvalidImage");
+  return t("otaFailed");
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
