@@ -20,6 +20,22 @@ type Status = {
   pack_voltage_mv?: number | null;
 };
 
+type RidePeak = {
+  pack_voltage_mv?: number | null;
+  current_deci_amps?: number | null;
+  delta_cell_voltage_mv?: number | null;
+  soc_percent?: number | null;
+  temperatures_c?: (number | null)[];
+};
+
+type RideRecord = {
+  current?: boolean;
+  max_current?: RidePeak;
+  max_delta?: RidePeak;
+};
+
+type RideRecordsResponse = { records?: RideRecord[] };
+
 type Config = {
   brightness?: number;
   volume?: number;
@@ -35,6 +51,26 @@ type BmsCandidate = {
   name?: string | null;
   rssi?: number;
 };
+
+type Localized = { zh: string; en: string };
+type ManifestItem = {
+  id: string;
+  kind: "range" | "select" | "action" | "choice" | "upload";
+  label: Localized;
+  value?: string | number | null;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: { value: string; label: Localized }[];
+  endpoint?: string;
+  options_endpoint?: string;
+  submit_endpoint?: string;
+  submit_key?: string;
+  code_header?: string;
+  accept?: string;
+};
+type ManifestSection = { id: string; label: Localized; submit?: { endpoint: string; method: "POST" }; items: ManifestItem[] };
+type SettingsManifest = { protocol_version: 1; sections: ManifestSection[] };
 
 type BleState = {
   tx?: BluetoothRemoteGATTCharacteristic;
@@ -63,8 +99,10 @@ const I18N = {
     connectHttp: "热点 API",
     connected: "已连接",
     connecting: "连接中",
+    currentRide: "本次开机",
     device: "设备",
     deviceAddress: "设备地址",
+    delta: "压差",
     disabled: "关闭",
     disconnected: "已断开",
     downloading: "下载中",
@@ -75,8 +113,11 @@ const I18N = {
     httpConnected: "热点 API 已连接",
     idle: "空闲",
     language: "语言",
+    maxCurrent: "最大电流",
+    maxDelta: "最大压差",
     network: "网络",
     noCandidates: "暂无候选设备",
+    noRideRecords: "暂无骑行峰值记录",
     offline: "离线",
     online: "在线",
     otaCodeMismatch: "固件验证码不匹配",
@@ -91,6 +132,8 @@ const I18N = {
     otaUploading: "固件上传中，请勿断开连接",
     overview: "概览",
     refresh: "刷新",
+    rideRecord: "骑行记录",
+    rideRecords: "骑行峰值记录",
     readyToReboot: "待重启",
     saved: "已保存",
     saveDevice: "保存设备",
@@ -119,8 +162,10 @@ const I18N = {
     connectHttp: "Hotspot API",
     connected: "connected",
     connecting: "connecting",
+    currentRide: "Current boot",
     device: "Device",
     deviceAddress: "Device address",
+    delta: "Delta",
     disabled: "disabled",
     disconnected: "disconnected",
     downloading: "downloading",
@@ -131,8 +176,11 @@ const I18N = {
     httpConnected: "Hotspot API connected",
     idle: "idle",
     language: "Language",
+    maxCurrent: "Max current",
+    maxDelta: "Max delta",
     network: "Network",
     noCandidates: "No candidates",
+    noRideRecords: "No ride peak records",
     offline: "offline",
     online: "online",
     otaCodeMismatch: "Firmware code does not match",
@@ -147,6 +195,8 @@ const I18N = {
     otaUploading: "Uploading firmware; keep the connection open",
     overview: "Overview",
     refresh: "Refresh",
+    rideRecord: "Ride record",
+    rideRecords: "Ride peak records",
     readyToReboot: "ready to reboot",
     saved: "Saved",
     saveDevice: "Save device",
@@ -218,7 +268,10 @@ export default function App() {
     speed_unit: "km/h",
     bms_type: "ant",
   });
+  const [manifest, setManifest] = useState<SettingsManifest>();
+  const [settingsValues, setSettingsValues] = useState<Record<string, string>>({});
   const [candidates, setCandidates] = useState<BmsCandidate[]>([]);
+  const [rideRecords, setRideRecords] = useState<RideRecord[]>([]);
   const [firmwareFile, setFirmwareFile] = useState<File>();
   const [firmwareCode, setFirmwareCode] = useState("");
   const [message, setMessage] = useState("未连接");
@@ -368,7 +421,7 @@ export default function App() {
   async function connectHttp() {
     await run(t("httpConnected"), async () => {
       setCurrentTransport("http");
-      await loadConfig();
+      await loadManifest();
       await refresh();
     });
   }
@@ -408,6 +461,12 @@ export default function App() {
   async function refresh() {
     const data = (await api("/api/status")) as Status;
     setStatus(data);
+    try {
+      const history = (await httpApi("/api/bms/ride-records")) as RideRecordsResponse;
+      setRideRecords(Array.isArray(history.records) ? history.records : []);
+    } catch {
+      setRideRecords([]);
+    }
   }
 
   async function loadConfig() {
@@ -422,6 +481,27 @@ export default function App() {
       bms_type: data.bms_type ?? "ant",
     });
     setLanguage(data.language === "en" ? "en" : "zh");
+  }
+
+  async function loadManifest() {
+    setManifest(undefined);
+    setSettingsValues({});
+    try {
+      const data = (await httpApi("/api/settings/manifest")) as SettingsManifest;
+      if (data.protocol_version !== 1 || !Array.isArray(data.sections) || !data.sections.every(validSection)) {
+        throw new Error("固件不支持动态设置，请升级");
+      }
+      const values: Record<string, string> = {};
+      for (const item of data.sections.flatMap((section) => section.items)) {
+        if (typeof item.value === "string" || typeof item.value === "number") values[item.id] = String(item.value);
+      }
+      setManifest(data);
+      setSettingsValues(values);
+      const languageItem = data.sections.flatMap((section) => section.items).find((item) => item.id === "language");
+      setLanguage(languageItem?.value === "en" ? "en" : "zh");
+    } catch (error) {
+      setMessage(error instanceof Error && error.message !== "404 Not Found" ? error.message : "固件不支持动态设置，请升级");
+    }
   }
 
   async function loadBmsCandidates() {
@@ -451,6 +531,37 @@ export default function App() {
     });
   };
 
+  const submitSection = (section: ManifestSection, event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!section.submit) return;
+    void run(t("saved"), async () => {
+      await post(section.submit!.endpoint, Object.fromEntries(new FormData(event.currentTarget)) as JsonRecord);
+      await loadManifest();
+      await refresh();
+    });
+  };
+
+  const runAction = (item: ManifestItem) => {
+    if (!item.endpoint) return;
+    void run(item.label[language], async () => { await post(item.endpoint!); await loadManifest(); });
+  };
+
+  const submitChoice = (item: ManifestItem) => {
+    if (!item.submit_endpoint || !item.submit_key) return;
+    void run(t("saved"), async () => {
+      await post(item.submit_endpoint!, { [item.submit_key!]: settingsValues[item.id] || "" });
+      await loadManifest();
+    });
+  };
+
+  const loadChoices = (item: ManifestItem) => {
+    if (!item.options_endpoint) return;
+    void run(item.label[language], async () => {
+      const data = (await api(item.options_endpoint!)) as { candidates?: BmsCandidate[] };
+      setCandidates(Array.isArray(data.candidates) ? data.candidates : []);
+    });
+  };
+
   const submitFirmware = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (transportRef.current !== "http") {
@@ -468,11 +579,13 @@ export default function App() {
 
     void run(t("otaRebooting"), async () => {
       setMessage(t("otaUploading"));
-      const response = await fetch(normalizeBaseUrl(baseUrl) + "/api/ota", {
+      const upload = manifest?.sections.flatMap((section) => section.items).find((item) => item.kind === "upload");
+      if (!upload?.endpoint || !upload.code_header) throw new Error("固件不支持动态设置，请升级");
+      const response = await fetch(normalizeBaseUrl(baseUrl) + upload.endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/octet-stream",
-          "X-Firmware-Code": firmwareCode,
+          [upload.code_header]: firmwareCode,
         },
         body: firmwareFile,
         mode: "cors",
@@ -523,6 +636,7 @@ export default function App() {
         <Metric label={t("battery")} value={battery} />
         <Metric label={t("bms")} value={formatState(status.bms, t)} />
         <Metric label="OTA" value={formatState(status.ota, t)} />
+        <RideRecordList records={rideRecords} t={t} />
       </section>
 
       <section className={tab === "network" ? "panel active" : "panel"}>
@@ -553,6 +667,14 @@ export default function App() {
       </section>
 
       <section className={tab === "device" ? "panel active" : "panel"}>
+        {manifest ? manifest.sections.filter((section) => section.id !== "update").map((section) => (
+          <form className="stack" key={section.id} onSubmit={(event) => submitSection(section, event)}>
+            <h2>{section.label[language]}</h2>
+            {section.items.map((item) => <ManifestControl key={item.id} item={item} language={language} busy={busy} value={settingsValues[item.id] || ""} candidates={candidates} onValue={(value) => setSettingsValues({ ...settingsValues, [item.id]: value })} onAction={() => runAction(item)} onLoadChoices={() => loadChoices(item)} onSubmitChoice={() => submitChoice(item)} />)}
+            {section.submit && <button type="submit" disabled={busy}>{t("saveDevice")}</button>}
+          </form>
+        )) : <p className="empty">{message || "固件不支持动态设置，请升级"}</p>}
+        {/*
         <form className="stack" onSubmit={submitDevice}>
           <label>
             <span>{t("brightness")}: {config.brightness ?? 80}%</span>
@@ -632,11 +754,20 @@ export default function App() {
           <button type="submit" disabled={busy}>
             {t("saveDevice")}
           </button>
-        </form>
+        </form> */}
       </section>
 
       <section className={tab === "update" ? "panel active" : "panel"}>
-        <form className="stack" onSubmit={submitFirmware}>
+        {manifest?.sections.filter((section) => section.id === "update").map((section) => (
+          <form className="stack" key={section.id} onSubmit={submitFirmware}>
+            <h2>{section.label[language]}</h2>
+            <ManifestControl item={section.items[0]} language={language} busy={busy} value="" candidates={[]} onValue={() => {}} onAction={() => {}} onLoadChoices={() => {}} onSubmitChoice={() => {}} />
+            <label><span>固件文件</span><input type="file" accept={section.items[0]?.accept} required onChange={(event) => { setFirmwareFile(event.target.files?.[0]); setFirmwareCode(""); }} /></label>
+            <label><span>固件验证码</span><input value={firmwareCode} inputMode="numeric" minLength={4} maxLength={4} required onChange={(event) => setFirmwareCode(event.target.value.replace(/\D/g, "").slice(0, 4))} /></label>
+            <button type="submit" disabled={busy || transport !== "http" || !firmwareFile || !/^[0-9]{4}$/.test(firmwareCode)}>{section.items[0]?.label[language]}</button>
+          </form>
+        ))}
+        {/* <form className="stack" onSubmit={submitFirmware}>
           <Metric label="OTA" value={formatState(status.ota, t)} />
           <p className="empty">{t("otaPurpose")}</p>
           <label>
@@ -668,7 +799,7 @@ export default function App() {
           <button type="submit" disabled={busy || transport !== "http" || !firmwareFile || !/^[0-9]{4}$/.test(firmwareCode)}>
             {t("uploadFirmware")}
           </button>
-        </form>
+        </form> */}
       </section>
 
       <p className="message">{busy ? "..." : message}</p>
@@ -699,6 +830,31 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function RideRecordList({ records, t }: { records: RideRecord[]; t: (key: keyof typeof I18N.zh) => string }) {
+  return (
+    <section className="ride-records">
+      <h2>{t("rideRecords")}</h2>
+      {records.length === 0 ? <p className="empty">{t("noRideRecords")}</p> : records.map((record, index) => (
+        <article className="ride-record" key={`${record.current ? "current" : "history"}-${index}`}>
+          <strong>{record.current ? t("currentRide") : `${t("rideRecord")} ${index + 1}`}</strong>
+          <RidePeakSummary label={t("maxCurrent")} peak={record.max_current} deltaLabel={t("delta")} />
+          <RidePeakSummary label={t("maxDelta")} peak={record.max_delta} deltaLabel={t("delta")} />
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function RidePeakSummary({ label, peak, deltaLabel }: { label: string; peak?: RidePeak; deltaLabel: string }) {
+  const temperatures = peak?.temperatures_c
+    ?.filter((value): value is number => Number.isFinite(value))
+    .map((value) => `${value}C`)
+    .join("/") || "--";
+  const delta = Number.isFinite(peak?.delta_cell_voltage_mv) ? `${peak!.delta_cell_voltage_mv} mV` : "--";
+  const soc = Number.isFinite(peak?.soc_percent) ? `${peak!.soc_percent}%` : "--";
+  return <p className="ride-peak"><strong>{label}</strong><span>{formatMillivolts(peak?.pack_voltage_mv)} | {formatDeciAmps(peak?.current_deci_amps)} | {deltaLabel} {delta} | {soc} | T {temperatures}</span></p>;
+}
+
 function CandidateList({ candidates, emptyLabel, onPick }: { candidates: BmsCandidate[]; emptyLabel: string; onPick: (mac: string) => void }) {
   if (candidates.length === 0) return <p className="empty">{emptyLabel}</p>;
   return (
@@ -716,6 +872,27 @@ function CandidateList({ candidates, emptyLabel, onPick }: { candidates: BmsCand
   );
 }
 
+function ManifestControl({ item, language, busy, value, candidates, onValue, onAction, onLoadChoices, onSubmitChoice }: {
+  item: ManifestItem; language: Language; busy: boolean; value: string; candidates: BmsCandidate[];
+  onValue: (value: string) => void; onAction: () => void; onLoadChoices: () => void; onSubmitChoice: () => void;
+}) {
+  if (item.kind === "range") return <label><span>{item.label[language]}: {value}</span><input name={item.id} type="range" min={item.min} max={item.max} step={item.step} value={value} onChange={(event) => onValue(event.target.value)} /></label>;
+  if (item.kind === "select") return <label><span>{item.label[language]}</span><select name={item.id} value={value} onChange={(event) => onValue(event.target.value)}>{item.options?.map((option) => <option key={option.value} value={option.value}>{option.label[language]}</option>)}</select></label>;
+  if (item.kind === "action") return <button type="button" disabled={busy} onClick={onAction}>{item.label[language]}</button>;
+  if (item.kind === "choice") return <><label><span>{item.label[language]}</span><input value={value} onChange={(event) => onValue(event.target.value)} /></label><div className="button-row"><button type="button" disabled={busy} onClick={onLoadChoices}>扫描</button><button className="secondary" type="button" disabled={busy || !value} onClick={onSubmitChoice}>绑定</button></div><CandidateList candidates={candidates} emptyLabel="暂无候选设备" onPick={onValue} /></>;
+  return null;
+}
+
+function validSection(section: unknown): section is ManifestSection {
+  if (!section || typeof section !== "object") return false;
+  const value = section as Partial<ManifestSection>;
+  return typeof value.id === "string" && !!value.label && typeof value.label.zh === "string" && typeof value.label.en === "string" && Array.isArray(value.items) && value.items.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const candidate = item as Partial<ManifestItem>;
+    return typeof candidate.id === "string" && ["range", "select", "action", "choice", "upload"].includes(String(candidate.kind)) && !!candidate.label && typeof candidate.label.zh === "string" && typeof candidate.label.en === "string";
+  });
+}
+
 function TabButton({ active, icon, label, onClick }: { active: boolean; icon: string; label: string; onClick: () => void }) {
   return (
     <button className={active ? "tab active" : "tab"} type="button" onClick={onClick}>
@@ -731,6 +908,10 @@ function normalizeBaseUrl(value: string) {
 
 function formatMillivolts(value: number | null | undefined) {
   return Number.isFinite(value) ? `${((value as number) / 1000).toFixed(2)} V` : "--";
+}
+
+function formatDeciAmps(value: number | null | undefined) {
+  return Number.isFinite(value) ? `${((value as number) / 10).toFixed(1)} A` : "--";
 }
 
 function formatState(value: unknown, t: (key: keyof typeof I18N.zh) => string) {

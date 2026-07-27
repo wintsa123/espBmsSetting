@@ -185,6 +185,42 @@ h1 {
   display: grid;
 }
 
+.ride-records {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.ride-records h2 {
+  margin: 0;
+  color: #142027;
+  font-size: 1rem;
+}
+
+.ride-record {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #d5dfe3;
+  border-radius: 8px;
+  padding: 11px;
+  background: #ffffff;
+}
+
+.ride-peak {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  color: #63737a;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.ride-peak strong {
+  color: #142027;
+  font-size: 0.88rem;
+}
+
 .stack {
   display: grid;
   gap: 12px;
