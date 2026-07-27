@@ -18,6 +18,8 @@ type Status = {
   ota?: string;
   local_battery_mv?: number | null;
   pack_voltage_mv?: number | null;
+  bms_capacity_estimate_mah?: number | null;
+  bms_capacity_estimate_state?: "ready" | "estimating" | "unsupported";
 };
 
 type RidePeak = {
@@ -92,6 +94,9 @@ const I18N = {
     bleControlUnavailable: "固件未开启蓝牙控制服务",
     bluetoothUnsupported: "当前浏览器不支持 Web Bluetooth",
     bms: "BMS",
+    bmsCapacityEstimate: "电池真实容量估算",
+    capacityEstimating: "估算中",
+    capacityUnsupported: "仅支持 ANT",
     bmsType: "保护板类型",
     brightness: "亮度",
     volume: "音量",
@@ -155,6 +160,9 @@ const I18N = {
     bleControlUnavailable: "Firmware BLE control service is not enabled",
     bluetoothUnsupported: "Web Bluetooth is not supported",
     bms: "BMS",
+    bmsCapacityEstimate: "Estimated real battery capacity",
+    capacityEstimating: "Estimating",
+    capacityUnsupported: "ANT only",
     bmsType: "BMS type",
     brightness: "Brightness",
     volume: "Volume",
@@ -671,6 +679,7 @@ export default function App() {
           <form className="stack" key={section.id} onSubmit={(event) => submitSection(section, event)}>
             <h2>{section.label[language]}</h2>
             {section.items.map((item) => <ManifestControl key={item.id} item={item} language={language} busy={busy} value={settingsValues[item.id] || ""} candidates={candidates} onValue={(value) => setSettingsValues({ ...settingsValues, [item.id]: value })} onAction={() => runAction(item)} onLoadChoices={() => loadChoices(item)} onSubmitChoice={() => submitChoice(item)} />)}
+            {section.items.some((item) => item.id === "bms_type") && <Metric label={t("bmsCapacityEstimate")} value={formatBmsCapacityEstimate(status, t)} />}
             {section.submit && <button type="submit" disabled={busy}>{t("saveDevice")}</button>}
           </form>
         )) : <p className="empty">{message || "固件不支持动态设置，请升级"}</p>}
@@ -912,6 +921,13 @@ function formatMillivolts(value: number | null | undefined) {
 
 function formatDeciAmps(value: number | null | undefined) {
   return Number.isFinite(value) ? `${((value as number) / 10).toFixed(1)} A` : "--";
+}
+
+function formatBmsCapacityEstimate(status: Status, t: (key: keyof typeof I18N.zh) => string) {
+  if (status.bms_capacity_estimate_state === "ready" && Number.isFinite(status.bms_capacity_estimate_mah)) {
+    return `${((status.bms_capacity_estimate_mah as number) / 1000).toFixed(1)} Ah`;
+  }
+  return status.bms_capacity_estimate_state === "unsupported" ? t("capacityUnsupported") : t("capacityEstimating");
 }
 
 function formatState(value: unknown, t: (key: keyof typeof I18N.zh) => string) {
