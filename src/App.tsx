@@ -55,6 +55,16 @@ type BmsCandidate = {
 };
 
 type Localized = { zh: string; en: string };
+type OnlineFirmware = {
+  profile: string;
+  name?: string;
+  chip?: string;
+  version?: string;
+  url: string;
+  size?: number;
+  code?: string;
+  note?: string;
+};
 type ManifestItem = {
   id: string;
   kind: "range" | "select" | "action" | "choice" | "upload";
@@ -89,6 +99,7 @@ type PendingBle = {
 const I18N = {
   zh: {
     apPassword: "设置热点密码",
+    appDownload: "下载 App",
     battery: "电池",
     bindBms: "绑定 BMS",
     bleControlUnavailable: "固件未开启蓝牙控制服务",
@@ -114,6 +125,7 @@ const I18N = {
     failed: "失败",
     firmware: "固件",
     firmwareCode: "固件验证码",
+    firmwareDownloading: "固件下载中",
     firmwareFile: "固件文件",
     httpConnected: "热点 API 已连接",
     idle: "空闲",
@@ -122,9 +134,11 @@ const I18N = {
     maxDelta: "最大压差",
     network: "网络",
     noCandidates: "暂无候选设备",
+    noOnlineFirmware: "未查询到可用固件",
     noRideRecords: "暂无骑行峰值记录",
     offline: "离线",
     online: "在线",
+    onlineFirmware: "在线固件",
     otaCodeMismatch: "固件验证码不匹配",
     otaFailed: "固件更新失败",
     otaHttpOnly: "OTA 需要先连接热点 API",
@@ -136,6 +150,7 @@ const I18N = {
     otaTooLarge: "固件超过 OTA 分区容量",
     otaUploading: "固件上传中，请勿断开连接",
     overview: "概览",
+    queryFirmware: "查询可用固件",
     refresh: "刷新",
     rideRecord: "骑行记录",
     rideRecords: "骑行峰值记录",
@@ -155,6 +170,7 @@ const I18N = {
   },
   en: {
     apPassword: "Setup AP password",
+    appDownload: "Download app",
     battery: "Battery",
     bindBms: "Bind BMS",
     bleControlUnavailable: "Firmware BLE control service is not enabled",
@@ -180,6 +196,7 @@ const I18N = {
     failed: "failed",
     firmware: "Firmware",
     firmwareCode: "Firmware code",
+    firmwareDownloading: "Downloading firmware",
     firmwareFile: "Firmware file",
     httpConnected: "Hotspot API connected",
     idle: "idle",
@@ -188,9 +205,11 @@ const I18N = {
     maxDelta: "Max delta",
     network: "Network",
     noCandidates: "No candidates",
+    noOnlineFirmware: "No firmware available",
     noRideRecords: "No ride peak records",
     offline: "offline",
     online: "online",
+    onlineFirmware: "Online firmware",
     otaCodeMismatch: "Firmware code does not match",
     otaFailed: "Firmware update failed",
     otaHttpOnly: "Connect through the hotspot API before OTA",
@@ -202,6 +221,7 @@ const I18N = {
     otaTooLarge: "Firmware exceeds the OTA partition size",
     otaUploading: "Uploading firmware; keep the connection open",
     overview: "Overview",
+    queryFirmware: "Query firmware",
     refresh: "Refresh",
     rideRecord: "Ride record",
     rideRecords: "Ride peak records",
@@ -259,6 +279,7 @@ function CastLanding() {
       <p>{english ? "The BMS casting app opens automatically when installed. Make sure the phone is connected to the device hotspot." : "已安装 BMS 投屏 App 时将自动打开。请确认手机已连接设备热点。"}</p>
       <a className="cast-open" href={deepLink}>{english ? "Open BMS Casting App" : "打开 BMS 投屏 App"}</a>
       <p className="cast-help">{english ? "If the app is not installed, install the APK and scan again." : "若未安装 App，请安装 APK 后重新扫码。"}</p>
+      <a className="cast-download" href="/apk/两轮智控.apk" download>{english ? "Download the latest APK" : "下载最新版 App"}</a>
     </main>
   );
 }
@@ -282,6 +303,9 @@ export default function App() {
   const [rideRecords, setRideRecords] = useState<RideRecord[]>([]);
   const [firmwareFile, setFirmwareFile] = useState<File>();
   const [firmwareCode, setFirmwareCode] = useState("");
+  const [onlineFirmwares, setOnlineFirmwares] = useState<OnlineFirmware[]>([]);
+  const [onlineFirmware, setOnlineFirmware] = useState<OnlineFirmware>();
+  const [onlineLoading, setOnlineLoading] = useState(false);
   const [message, setMessage] = useState("未连接");
   const [busy, setBusy] = useState(false);
   const [ble, setBle] = useState<BleState>({});
@@ -604,7 +628,40 @@ export default function App() {
     });
   };
 
-  const battery = formatMillivolts(status.local_battery_mv ?? status.pack_voltage_mv);
+  async function loadOnlineFirmwares() {
+    if (onlineLoading) return;
+    setOnlineLoading(true);
+    try {
+      const response = await fetch("/firmware/firmware.json", { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = (await response.json()) as { firmwares?: OnlineFirmware[] };
+      setOnlineFirmwares(Array.isArray(data.firmwares) ? data.firmwares : []);
+      if (!Array.isArray(data.firmwares) || data.firmwares.length === 0) setMessage(t("noOnlineFirmware"));
+    } finally {
+      setOnlineLoading(false);
+    }
+  }
+
+  async function pickOnlineFirmware(profile: string) {
+    const selected = onlineFirmwares.find((item) => item.profile === profile);
+    if (!selected) return;
+    setBusy(true);
+    try {
+      setMessage(t("firmwareDownloading"));
+      const response = await fetch(selected.url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      setFirmwareFile(new File([blob], `${selected.profile}.bin`, { type: "application/octet-stream" }));
+      setFirmwareCode(selected.code || "");
+      setOnlineFirmware(selected);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const battery = formatMillivolts(status.pack_voltage_mv ?? status.local_battery_mv);
   const connection = transport === "ble" ? `BLE ${ble.deviceName || ""}`.trim() : normalizeBaseUrl(baseUrl);
 
   return (
@@ -767,6 +824,27 @@ export default function App() {
       </section>
 
       <section className={tab === "update" ? "panel active" : "panel"}>
+        <div className="stack">
+          <h2>{t("onlineFirmware")}</h2>
+          <div className="button-row">
+            <button type="button" disabled={busy || onlineLoading} onClick={() => void loadOnlineFirmwares()}>
+              {onlineLoading ? "…" : t("queryFirmware")}
+            </button>
+            <select
+              value={onlineFirmware?.profile || ""}
+              disabled={busy || onlineFirmwares.length === 0}
+              onChange={(event) => void pickOnlineFirmware(event.target.value)}
+            >
+              <option value="">{onlineFirmwares.length === 0 ? t("noOnlineFirmware") : "—"}</option>
+              {onlineFirmwares.map((item) => (
+                <option key={item.profile} value={item.profile}>
+                  {`${item.name || item.profile}${item.version ? ` v${item.version}` : ""}${item.chip ? ` [${item.chip}]` : ""}`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <a className="app-download" href="/apk/两轮智控.apk" download>{t("appDownload")}</a>
+        </div>
         {manifest?.sections.filter((section) => section.id === "update").map((section) => (
           <form className="stack" key={section.id} onSubmit={submitFirmware}>
             <h2>{section.label[language]}</h2>
