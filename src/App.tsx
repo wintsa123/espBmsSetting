@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { dashboardIcon, fallbackScooter, socBar, bars } from "./vendor/dashboard-parts";
+import { dashboardIcon, socBar, bars } from "./vendor/dashboard-parts";
 import { bindDashboardMotion, updateDashboardMotion } from "./vendor/dashboard-motion";
+import VehicleImage from "./VehicleImage";
+import { ThemeButton } from "./DashboardTheme";
 
 const CONTROL_SERVICE_UUID = "4f91e100-23b2-4ee7-9f9a-86d1093f0a01";
 const CONTROL_TX_UUID = "4f91e100-23b2-4ee7-9f9a-86d1093f0a02";
@@ -8,7 +10,8 @@ const CONTROL_RX_UUID = "4f91e100-23b2-4ee7-9f9a-86d1093f0a03";
 
 type Language = "zh" | "en";
 type Transport = "http" | "ble";
-type Tab = "overview" | "rides" | "network" | "device" | "update";
+type Tab = "overview" | "rides" | "device";
+type DevicePane = "network" | "device" | "update";
 type JsonRecord = Record<string, unknown>;
 
 type Status = {
@@ -320,6 +323,7 @@ export default function App() {
   const [language, setLanguage] = useState<Language>("zh");
   const [transport, setTransport] = useState<Transport>("http");
   const [tab, setTab] = useState<Tab>("overview");
+  const [devicePane, setDevicePane] = useState<DevicePane>("device");
   const [baseUrl, setBaseUrl] = useState("http://192.168.4.1");
   const [status, setStatus] = useState<Status>({});
   const [config, setConfig] = useState<Config>({
@@ -337,18 +341,10 @@ export default function App() {
   const native = window.BmsNative;
   const phoneRef = useRef<HTMLDivElement>(null);
   const [clock, setClock] = useState(() => new Date());
-  const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
   useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 30000);
     return () => window.clearInterval(timer);
   }, []);
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => { document.documentElement.dataset.theme = theme === "system" ? (media.matches ? "dark" : "light") : theme; };
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, [theme]);
   useEffect(() => phoneRef.current ? bindDashboardMotion(phoneRef.current) : undefined, []);
   const [rideRecords, setRideRecords] = useState<RideRecord[]>([]);
   const [firmwareFile, setFirmwareFile] = useState<File>();
@@ -811,7 +807,6 @@ export default function App() {
   });
 
   const battery = formatMillivolts(status.pack_voltage_mv ?? status.local_battery_mv);
-  const connection = transport === "ble" ? `BLE ${ble.deviceName || ""}`.trim() : normalizeBaseUrl(baseUrl);
 
   const soc = typeof status.soc_percent === "number" && Number.isFinite(status.soc_percent) ? Math.max(0, Math.min(100, status.soc_percent)) : null;
 
@@ -828,15 +823,12 @@ export default function App() {
       </>}
       <header className="topbar" id="topbar">
         <div className="topbar-controls">
-          <button className="vswitch" type="button" onClick={() => setTab("network")} aria-label={t("deviceAddress")}>
-            <span className="vtext"><span className="vname">两轮智控</span><span className="vsub">{connection}</span></span>
-            <DashboardIcon name="link" size={18} />
-          </button>
+          <span className="app-title">两轮智控</span>
           <span className="spacer" />
           <button className="iconbtn" type="button" disabled={busy} aria-label={t("refresh")} onClick={() => void run(t("refresh"), refresh)}>
             {busy ? <span className="loading-ring" aria-hidden="true" /> : <DashboardIcon name="refresh" size={22} />}
           </button>
-          <button className="iconbtn" type="button" aria-label={language === "zh" ? "切换明暗主题" : "Switch theme"} onClick={() => setTheme(theme === "system" ? "light" : theme === "light" ? "dark" : "system")}><DashboardIcon name={theme === "system" ? "auto" : theme === "dark" ? "sun" : "moon"} size={22} /></button>
+          <ThemeButton language={language} />
           <button className="iconbtn" type="button" aria-label={t("device")} onClick={() => setTab("device")}><DashboardIcon name="gear" size={22} /></button>
         </div>
         <div className="topbar-page-title" role="heading" aria-level={1} aria-hidden="true">{t(tab === "rides" ? "recentRides" : tab)}</div>
@@ -845,10 +837,10 @@ export default function App() {
       <div className="scroll" id="scroll">
       <section className={tab === "overview" ? "panel page active" : "panel page"}>
         <article className="card hero-card">
-          <div className="hero-top"><span className={`chip${connected ? " accent" : ""}`}><i className="dot" />{t(connected ? "connected" : "disconnected")}</span><span className="chip"><i className="dot" />{transport === "ble" ? "Bluetooth" : "Wi-Fi"}</span><span className="spacer" /><span className="chip">ESP32</span></div>
+          <div className="hero-top"><span className={`chip${connected ? " accent" : ""}`}><i className="dot" />{t(connected ? "connected" : "disconnected")}</span><span className="chip"><i className="dot" />{transport === "ble" ? "Bluetooth" : "Wi-Fi"}</span><span className="spacer" /><span className="chip">AE5</span></div>
           <div className="hero-stage">
             <div className="bignum left"><b className="tnum"><span data-num={soc ?? ""} data-key="soc">{soc ?? "—"}</span><i>%</i></b></div>
-            <span className="vehicle-art" dangerouslySetInnerHTML={{ __html: fallbackScooter(true) }} />
+            <VehicleImage language={language} />
             <div className="bignum right volt"><b className="tnum vnum"><span data-num={battery === "--" ? "" : battery.replace(/ V$/, "")} data-key="voltage">{battery.replace(/ V$/, "")}</span><i>V</i></b></div>
           </div>
           <div role="progressbar" aria-label={t("battery")} aria-valuenow={soc ?? undefined} aria-valuemin={0} aria-valuemax={100} dangerouslySetInnerHTML={{ __html: socBar(soc ?? 0, "var(--md-sys-color-primary)", false, true) }} />
@@ -882,7 +874,11 @@ export default function App() {
         <RideRecordList records={rideRecords} t={t} />
       </section>
 
-      <section className={tab === "network" ? "panel page active" : "panel page"}>
+      <section className={tab === "device" ? "panel page active" : "panel page"}>
+        <nav className="device-subnav" aria-label={language === "zh" ? "我的功能" : "My device tools"}>
+          {(["network", "device", "update"] as const).map(pane => <button className={`btn${devicePane === pane ? " tonal" : " text"}`} key={pane} type="button" aria-pressed={devicePane === pane} onClick={() => setDevicePane(pane)}>{t(pane)}</button>)}
+        </nav>
+      <section className="device-pane" hidden={devicePane !== "network"}>
         <div className="stack">
           <label>
             <span>{t("deviceAddress")}</span>
@@ -909,7 +905,7 @@ export default function App() {
         </form>
       </section>
 
-      <section className={tab === "device" ? "panel page active" : "panel page"}>
+      <section className="device-pane" hidden={devicePane !== "device"}>
         {native && <button type="button" onClick={() => native.openNative("SETTINGS")}>{t("deviceTools")}</button>}
         {manifest ? manifest.sections.filter((section) => section.id !== "update").map((section) => (
           <form className="stack" key={section.id} onSubmit={(event) => submitSection(section, event)}>
@@ -922,7 +918,7 @@ export default function App() {
         )) : <p className="empty">{message || "固件不支持动态设置，请升级"}</p>}
       </section>
 
-      <section className={tab === "update" ? "panel page active" : "panel page"}>
+      <section className="device-pane" hidden={devicePane !== "update"}>
         <div className="stack">
           <h2>{t("onlineFirmware")}</h2>
           <div className="button-row">
@@ -955,16 +951,16 @@ export default function App() {
         ))}
       </section>
 
+      </section>
+
       <p className="message" role="status">{busy ? <span className="loading-ring" aria-hidden="true" /> : message}</p>
       </div>
 
       <nav className="tabbar" id="tabbar" aria-label="main">
         <span className="tab-ind" aria-hidden="true" />
-        <TabButton active={tab === "overview"} label={t("overview")} icon="speed" tab="overview" onClick={() => setTab("overview")} />
+        <TabButton active={tab === "overview"} label={language === "zh" ? "爱车" : "Vehicle"} icon="speed" tab="overview" onClick={() => setTab("overview")} />
         <TabButton active={tab === "rides"} label={t("recentRides")} icon="route" tab="rides" onClick={() => setTab("rides")} />
-        <TabButton active={tab === "network"} label={t("network")} icon="link" tab="network" onClick={() => setTab("network")} />
-        <TabButton active={tab === "device"} label={t("device")} icon="gear" tab="device" onClick={() => setTab("device")} />
-        <TabButton active={tab === "update"} label={t("update")} icon="download" tab="update" onClick={() => setTab("update")} />
+        <TabButton active={tab === "device"} label={language === "zh" ? "我的" : "Mine"} icon="gear" tab="device" onClick={() => setTab("device")} />
       </nav>
     </div>
     </div>

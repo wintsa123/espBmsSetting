@@ -1,0 +1,12 @@
+/* React sheet adaptation. Palette, swatches and sheet transitions are the original dashboard.css rules. */
+.dashboard-theme-sheet button.sheet-item { width: 100%; border: 0; background: transparent !important; color: inherit !important; text-align: left; font: inherit !important; cursor: pointer; padding: 13px 0 !important; border-radius: 0 !important; }
+.dashboard-theme-sheet button.sheet-item.sel { color: var(--md-sys-color-primary) !important; }
+.dashboard-theme-sheet button.accent-sw { min-height: 52px; padding: 0 !important; border: 0; border-radius: 0 !important; background: none !important; font: inherit !important; color: var(--md-sys-color-on-surface-variant) !important; }
+.dashboard-theme-sheet .sheet-item > div { flex: 1; }
+.dashboard-theme-sheet .sheet-head > div { flex: 1; }
+.dashboard-theme-sheet .sheet-head .iconbtn { flex: none; }
+.dashboard-theme-sheet .accent-title { margin-top: 18px; }
+.dashboard-theme-sheet input { box-sizing: border-box; }
+.dashboard-theme-sheet .theme-color-inputs input[data-hex] { width: 100%; }
+.dashboard-theme-sheet .theme-color-inputs input { min-height: 44px; }
+.dashboard-theme-sheet .theme-edit-error { margin: 0; }
