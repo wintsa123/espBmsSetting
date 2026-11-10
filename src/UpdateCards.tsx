@@ -1,17 +1,28 @@
 import { ReactNode, useRef, useState } from "react";
 import { parseApkRelease, updateUrl, type ApkRelease } from "./update-source";
 import { useWebUpdate } from "./web-update";
+import DashboardSheet from "./DashboardSheet";
 
-export function UpdateCard({ title, version, status, checking, onCheck, children }: {
-  title: string; version: string; status: string; checking?: boolean; onCheck: () => void; children?: ReactNode;
+export function UpdateCard({ title, version, status, checking, onCheck, language, children }: {
+  title: string; version: string; status: string; checking?: boolean; onCheck: () => void; language: "zh" | "en"; children?: ReactNode;
 }) {
-  return <section className="card stack settings-detail update-card" aria-label={title}>
-    <button className="update-card-check" type="button" onClick={onCheck} disabled={checking} aria-label={`${title} · ${status}`}>
-      <span className="update-card-heading"><span className="card-title">{title}</span><span className="card-sub">{version}</span></span>
-      <span className="update-card-status" aria-live="polite">{status}<span aria-hidden="true"> ›</span></span>
-    </button>
-    {children}
-  </section>;
+  const [open, setOpen] = useState(false);
+  const zh = language === "zh";
+  return <>
+    <div className="update-row" role="group" aria-label={title}>
+      <span>{title}</span>
+      <button className="btn tonal update-card-check" type="button" aria-label={`${title} · ${zh ? "查看更新" : "View update"}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => { setOpen(true); if (!checking) onCheck(); }}>
+        {zh ? "查看更新" : "View update"}
+      </button>
+    </div>
+    <DashboardSheet open={open} title={title} subtitle={version} closeLabel={zh ? "关闭" : "Close"} onClose={() => setOpen(false)}>
+      <div className="stack device-forms update-details">
+        <p className="update-card-status" role="status" aria-live="polite">{checking && <span className="loading-ring" aria-hidden="true" />}{status}</p>
+        {children}
+        <button className="btn tonal" type="button" disabled={checking} onClick={onCheck}>{checking ? (zh ? "正在检查…" : "Checking…") : (zh ? "再次检查" : "Check again")}</button>
+      </div>
+    </DashboardSheet>
+  </>;
 }
 
 export default function ClientUpdateCards({ language, appInfo }: { language: "zh" | "en"; appInfo: { versionName?: string; versionCode?: number } }) {
@@ -41,12 +52,12 @@ export default function ClientUpdateCards({ language, appInfo }: { language: "zh
     unconfigured: zh ? "更新源未配置" : "Update source not configured", available: zh ? "可用版本" : "Available version",
   }[value] || (zh ? "查找更新" : "Check for updates"));
   return <>
-    <UpdateCard title={zh ? "App 更新" : "App update"} version={native ? `${zh ? "当前版本" : "Current"} ${appInfo.versionName || "—"}` : (zh ? "网页中可查询 App 安装包" : "Check the Android installer from the web")} status={status(appState)} checking={appState === "checking"} onCheck={() => void checkApp()}>
+    <UpdateCard language={language} title={zh ? "App 更新" : "App update"} version={native ? `${zh ? "当前版本" : "Current"} ${appInfo.versionName || "—"}` : (zh ? "网页中可查询 App 安装包" : "Check the Android installer from the web")} status={status(appState)} checking={appState === "checking"} onCheck={() => void checkApp()}>
       {appError && <p className="empty" role="status">{appError}</p>}
       {apk && <p className="card-sub">{zh ? "分发版本" : "Published version"} {apk.versionName}{apk.note ? ` · ${apk.note}` : ""}</p>}
       {apk && appState === "available" && (native ? <button className="btn tonal" type="button" onClick={() => native.installAppUpdate ? native.installAppUpdate() : native.openNative("SETTINGS")}>{zh ? "前往下载并安装" : "Download and install"}</button> : <a className="btn tonal app-download" href={apk.url}>{zh ? "下载 App" : "Download App"}</a>)}
     </UpdateCard>
-    <UpdateCard title={zh ? "Web 前端更新" : "Web frontend update"} version={`${zh ? "当前资源" : "Current assets"} ${web.currentVersion}`} status={status(web.status)} checking={web.status === "checking" || web.status === "downloading"} onCheck={() => void check()}>
+    <UpdateCard language={language} title={zh ? "Web 前端更新" : "Web frontend update"} version={`${zh ? "当前资源" : "Current assets"} ${web.currentVersion}`} status={status(web.status)} checking={web.status === "checking" || web.status === "downloading"} onCheck={() => void check()}>
       <p className="card-sub">{zh ? "打开时使用本地资源，并在后台检查下载；下载完成后，下次打开或点击重启生效。" : "Uses local assets and downloads updates in the background. Apply on the next launch or restart here."}</p>
       {web.pendingVersion && <p className="card-sub">{zh ? "待启用版本" : "Ready version"} {web.pendingVersion}</p>}
       {web.error && <p className="empty" role="status">{web.error}</p>}

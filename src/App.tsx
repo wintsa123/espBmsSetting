@@ -953,8 +953,10 @@ export default function App() {
           </form>
         )) : <p className="empty">{language === "zh" ? "连接设备后显示配置项" : "Connect to the device to view settings"}</p>}
         </section>
+        <section className="card stack settings-detail update-card" aria-labelledby="settings-update-title">
+        <div className="card-title" id="settings-update-title">{language === "zh" ? "更新" : "Updates"}</div>
         <ClientUpdateCards language={language} appInfo={appInfo} />
-        <UpdateCard title={language === "zh" ? "固件更新" : "Firmware update"} version={`${language === "zh" ? "当前面板" : "Current panel"} ${status.version || "—"}`} checking={onlineLoading} onCheck={() => void loadOnlineFirmwares()} status={onlineLoading ? (language === "zh" ? "正在检查…" : "Checking…") : firmwareCheck === "error" ? (language === "zh" ? "检查失败，点击重试" : "Failed; tap to retry") : firmwareCheck === "checked" ? (language === "zh" ? `找到 ${onlineFirmwares.length} 款固件` : `${onlineFirmwares.length} releases found`) : (language === "zh" ? "查找更新" : "Check for updates")}>
+        <UpdateCard language={language} title={language === "zh" ? "固件更新" : "Firmware update"} version={`${language === "zh" ? "当前面板" : "Current panel"} ${status.version || "—"}`} checking={onlineLoading} onCheck={() => void loadOnlineFirmwares()} status={onlineLoading ? (language === "zh" ? "正在检查…" : "Checking…") : firmwareCheck === "error" ? (language === "zh" ? "检查失败，点击重试" : "Failed; tap to retry") : firmwareCheck === "checked" ? (language === "zh" ? `找到 ${onlineFirmwares.length} 款固件` : `${onlineFirmwares.length} releases found`) : (language === "zh" ? "查找更新" : "Check for updates")}>
         {firmwareCheckError && <p className="empty" role="status">{firmwareCheckError}</p>}
         <div className="stack">
           <h2>{t("onlineFirmware")}</h2>
@@ -984,6 +986,7 @@ export default function App() {
           </form>
         ))}
         </UpdateCard>
+        </section>
       </section>
 
       {tab !== "rides" && <p className="message" role="status">{busy ? <span className="loading-ring" aria-hidden="true" /> : message}</p>}
