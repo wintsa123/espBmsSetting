@@ -42,6 +42,7 @@ interface RequestInit {
 
 interface Window {
   BmsNative?: {
+    getAppInfo?: () => string;
     request: (id: string, method: string, path: string, body: string, host: string) => void;
     connectBle: () => void;
     bleConnected: () => boolean;
