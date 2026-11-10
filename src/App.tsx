@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { dashboardIcon, fallbackScooter, socBar, bars } from "./vendor/dashboard-parts";
+import { bindDashboardMotion, updateDashboardMotion } from "./vendor/dashboard-motion";
 
 const CONTROL_SERVICE_UUID = "4f91e100-23b2-4ee7-9f9a-86d1093f0a01";
 const CONTROL_TX_UUID = "4f91e100-23b2-4ee7-9f9a-86d1093f0a02";
@@ -333,6 +335,21 @@ export default function App() {
   const [historyAvailable, setHistoryAvailable] = useState(false);
   const [connected, setConnected] = useState(false);
   const native = window.BmsNative;
+  const phoneRef = useRef<HTMLDivElement>(null);
+  const [clock, setClock] = useState(() => new Date());
+  const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(new Date()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => { document.documentElement.dataset.theme = theme === "system" ? (media.matches ? "dark" : "light") : theme; };
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, [theme]);
+  useEffect(() => phoneRef.current ? bindDashboardMotion(phoneRef.current) : undefined, []);
   const [rideRecords, setRideRecords] = useState<RideRecord[]>([]);
   const [firmwareFile, setFirmwareFile] = useState<File>();
   const [firmwareCode, setFirmwareCode] = useState("");
@@ -789,58 +806,83 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    if (phoneRef.current) updateDashboardMotion(phoneRef.current, tab, { busy });
+  });
+
   const battery = formatMillivolts(status.pack_voltage_mv ?? status.local_battery_mv);
   const connection = transport === "ble" ? `BLE ${ble.deviceName || ""}`.trim() : normalizeBaseUrl(baseUrl);
 
   const soc = typeof status.soc_percent === "number" && Number.isFinite(status.soc_percent) ? Math.max(0, Math.min(100, status.soc_percent)) : null;
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">{connection}</p>
-          <h1>ESP32 BMS GPS</h1>
+    <div className={`stage ${native ? "native-app" : "web-preview"}`}>
+    <div className="phone has-tabveil" id="phone" ref={phoneRef}>
+      {!native && <>
+        <div className="preview-statusbar" aria-label={language === "zh" ? "手机预览状态栏" : "Phone preview status bar"}>
+          <span className="tnum">{clock.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+          <span aria-hidden="true"><svg viewBox="0 0 20 16" fill="currentColor"><path d="M1 15V11h3v4zm5 0V8h3v7zm5 0V5h3v10zm5 0V1h3v14z"/></svg><svg viewBox="0 0 20 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M1 5q9-8 18 0M4 8q6-5 12 0M7 11q3-3 6 0"/><circle cx="10" cy="14" r="1" fill="currentColor" stroke="none"/></svg><svg viewBox="0 0 24 14" fill="none" stroke="currentColor"><rect x="1" y="1" width="19" height="12" rx="3"/><path d="M22 5v4"/><rect x="3" y="3" width="15" height="8" rx="1" fill="currentColor" stroke="none"/></svg></span>
         </div>
-        <button className="icon-button" type="button" disabled={busy} onClick={() => void run(t("refresh"), refresh)}>
-          ↻
-        </button>
+        <div className="preview-camera" aria-hidden="true" />
+        <div className="preview-home-indicator" aria-hidden="true" />
+      </>}
+      <header className="topbar" id="topbar">
+        <div className="topbar-controls">
+          <button className="vswitch" type="button" onClick={() => setTab("network")} aria-label={t("deviceAddress")}>
+            <span className="vtext"><span className="vname">两轮智控</span><span className="vsub">{connection}</span></span>
+            <DashboardIcon name="link" size={18} />
+          </button>
+          <span className="spacer" />
+          <button className="iconbtn" type="button" disabled={busy} aria-label={t("refresh")} onClick={() => void run(t("refresh"), refresh)}>
+            {busy ? <span className="loading-ring" aria-hidden="true" /> : <DashboardIcon name="refresh" size={22} />}
+          </button>
+          <button className="iconbtn" type="button" aria-label={language === "zh" ? "切换明暗主题" : "Switch theme"} onClick={() => setTheme(theme === "system" ? "light" : theme === "light" ? "dark" : "system")}><DashboardIcon name={theme === "system" ? "auto" : theme === "dark" ? "sun" : "moon"} size={22} /></button>
+          <button className="iconbtn" type="button" aria-label={t("device")} onClick={() => setTab("device")}><DashboardIcon name="gear" size={22} /></button>
+        </div>
+        <div className="topbar-page-title" role="heading" aria-level={1} aria-hidden="true">{t(tab === "rides" ? "recentRides" : tab)}</div>
       </header>
-
-      <section className={tab === "overview" ? "panel active" : "panel"}>
+      <div className="loadbar" id="loadbar" aria-hidden="true" />
+      <div className="scroll" id="scroll">
+      <section className={tab === "overview" ? "panel page active" : "panel page"}>
         <article className="card hero-card">
-          <div className="hero-top"><span className={`chip${connected ? " accent" : ""}`}>{t(connected ? "connected" : "disconnected")}</span><span className="chip">{transport === "ble" ? "Bluetooth" : "Wi-Fi"}</span><span className="spacer" /><span className="hero-title">ESP32 BMS GPS</span></div>
+          <div className="hero-top"><span className={`chip${connected ? " accent" : ""}`}><i className="dot" />{t(connected ? "connected" : "disconnected")}</span><span className="chip"><i className="dot" />{transport === "ble" ? "Bluetooth" : "Wi-Fi"}</span><span className="spacer" /><span className="chip">ESP32</span></div>
           <div className="hero-stage">
-            <div className="bignum left"><b className="tnum">{soc ?? "—"}<i>%</i></b><span>{t("battery")}</span></div>
-            <svg className="hero-pic" viewBox="0 0 240 160" role="img" aria-label={t("overview")}><circle cx="48" cy="117" r="27" fill="none" stroke="currentColor" strokeWidth="9"/><circle cx="194" cy="117" r="27" fill="none" stroke="currentColor" strokeWidth="9"/><path d="M48 117l36-61h47l39 61H91L67 79m64-23 17-20h24m-37 29h32l27 52M81 51h39" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <div className="bignum right volt"><b className="tnum">{battery.replace(/ V$/, "")}<i>V</i></b><span>{t("battery")}</span></div>
+            <div className="bignum left"><b className="tnum"><span data-num={soc ?? ""} data-key="soc">{soc ?? "—"}</span><i>%</i></b></div>
+            <span className="vehicle-art" dangerouslySetInnerHTML={{ __html: fallbackScooter(true) }} />
+            <div className="bignum right volt"><b className="tnum vnum"><span data-num={battery === "--" ? "" : battery.replace(/ V$/, "")} data-key="voltage">{battery.replace(/ V$/, "")}</span><i>V</i></b></div>
           </div>
-          <div className="soc-track" role="progressbar" aria-label={t("battery")} aria-valuenow={soc ?? undefined} aria-valuemin={0} aria-valuemax={100}><div style={{ width: `${soc ?? 0}%` }} /></div>
-          <div className="hero-meta"><span>{t("firmware")} {status.version || "—"}</span><span>{t("bms")} {formatState(status.bms, t)}</span></div>
+          <div role="progressbar" aria-label={t("battery")} aria-valuenow={soc ?? undefined} aria-valuemin={0} aria-valuemax={100} dangerouslySetInnerHTML={{ __html: socBar(soc ?? 0, "var(--md-sys-color-primary)", false, true) }} />
+          <div className="hero-meta"><span>{t("firmware")} {status.version || "—"}</span><i className="sep" /><span>{t("bms")} {formatState(status.bms, t)}</span></div>
         </article>
-        <div className="hero-grid grid2">
+        <div className="card hero-grid grid2">
           <Metric label={t("speed")} value={`${status.speed ?? "—"} ${status.speed_unit || "km/h"}`} />
           <Metric label={t("current")} value={formatDeciAmps(status.current_deci_amps)} />
           <Metric label={t("power")} value={status.controller_power_w == null ? "—" : `${status.controller_power_w} W`} />
           <Metric label={t("bmsCapacityEstimate")} value={formatBmsCapacityEstimate(status, t)} />
         </div>
-        <section className="quick-actions">
-          <button type="button" disabled={busy} onClick={() => void connectHttp()}>{t("connectHttp")}</button>
-          <button className="secondary" type="button" disabled={busy} onClick={() => void connectBle()}>{t("connectBle")}</button>
-          {native && <button type="button" onClick={() => native.openNative("CAST")}>{t("cast")}</button>}
-          {native && <button className="secondary" type="button" onClick={() => native.openNative("BMS")}>{t("deviceTools")}</button>}
+        <section className="actions device-actions">
+          <button className="action" type="button" disabled={busy} onClick={() => void connectHttp()}><span className="ico"><DashboardIcon name="link" size={20} /></span><span className="lbl">{t("connectHttp")}</span></button>
+          <button className="action" type="button" disabled={busy} onClick={() => void connectBle()}><span className="ico"><DashboardIcon name="bolt" size={20} /></span><span className="lbl">{t("connectBle")}</span></button>
+          {native && <button className="action" type="button" onClick={() => native.openNative("CAST")}><span className="ico"><DashboardIcon name="gauge" size={20} /></span><span className="lbl">{t("cast")}</span></button>}
+          {native && <button className="action" type="button" onClick={() => native.openNative("BMS")}><span className="ico"><DashboardIcon name="gear" size={20} /></span><span className="lbl">{t("deviceTools")}</span></button>}
         </section>
         <section className="card ride-card recent-rides">
-          <div className="section-head"><h2>{t("recentRides")}</h2><button className="icon-button" type="button" onClick={() => setTab("rides")} aria-label={t("rideSessions")}>→</button></div>
-          <SessionList sessions={sessions.slice(0, 2)} language={language} t={t} available={historyAvailable} />
+          <div className="card-head"><span className="muted"><DashboardIcon name="route" size={18} /></span><div className="card-title">{t("recentRides")}</div><span className="spacer"/><button className="iconbtn" type="button" onClick={() => setTab("rides")} aria-label={t("rideSessions")}><DashboardIcon name="right" size={18} /></button></div>
+          {historyAvailable && sessions.length > 0 ? <>
+            <div className="grid2"><Metric label={t("rideSessions")} value={String(sessions.length)} /><Metric label={t("elapsed")} value={`${Math.floor(sessions.reduce((sum, ride) => sum + ride.elapsed_s, 0) / 60)} min`} /></div>
+            <div className="card-sub mt8">{language === "zh" ? "最近 7 次骑行时长 · 分钟" : "Last 7 rides · minutes"}</div>
+            <div dangerouslySetInnerHTML={{ __html: bars(sessions.slice(0, 7).reverse().map(ride => ({ date: `${t("localRecord")} #${ride.id}`, day: ride.id, mile: Math.round(ride.elapsed_s / 6) / 10 })), language === "zh" ? "分钟" : "min", 0) }} />
+          </> : <SessionList sessions={[]} language={language} t={t} available={historyAvailable} />}
+
         </section>
       </section>
 
-      <section className={tab === "rides" ? "panel active" : "panel"}>
+      <section className={tab === "rides" ? "panel page active" : "panel page"}>
         <section className="card"><h2>{t("recentRides")}</h2><SessionList sessions={sessions} language={language} t={t} available={historyAvailable} /></section>
         <RideRecordList records={rideRecords} t={t} />
       </section>
 
-      <section className={tab === "network" ? "panel active" : "panel"}>
+      <section className={tab === "network" ? "panel page active" : "panel page"}>
         <div className="stack">
           <label>
             <span>{t("deviceAddress")}</span>
@@ -867,7 +909,7 @@ export default function App() {
         </form>
       </section>
 
-      <section className={tab === "device" ? "panel active" : "panel"}>
+      <section className={tab === "device" ? "panel page active" : "panel page"}>
         {native && <button type="button" onClick={() => native.openNative("SETTINGS")}>{t("deviceTools")}</button>}
         {manifest ? manifest.sections.filter((section) => section.id !== "update").map((section) => (
           <form className="stack" key={section.id} onSubmit={(event) => submitSection(section, event)}>
@@ -880,7 +922,7 @@ export default function App() {
         )) : <p className="empty">{message || "固件不支持动态设置，请升级"}</p>}
       </section>
 
-      <section className={tab === "update" ? "panel active" : "panel"}>
+      <section className={tab === "update" ? "panel page active" : "panel page"}>
         <div className="stack">
           <h2>{t("onlineFirmware")}</h2>
           <div className="button-row">
@@ -913,16 +955,19 @@ export default function App() {
         ))}
       </section>
 
-      <p className="message">{busy ? "..." : message}</p>
+      <p className="message" role="status">{busy ? <span className="loading-ring" aria-hidden="true" /> : message}</p>
+      </div>
 
-      <nav className="tabs tabbar" aria-label="main">
-        <TabButton active={tab === "overview"} label={t("overview")} icon="⌁" onClick={() => setTab("overview")} />
-        <TabButton active={tab === "rides"} label={t("recentRides")} icon="▥" onClick={() => setTab("rides")} />
-        <TabButton active={tab === "network"} label={t("network")} icon="⇄" onClick={() => setTab("network")} />
-        <TabButton active={tab === "device"} label={t("device")} icon="⚙" onClick={() => setTab("device")} />
-        <TabButton active={tab === "update"} label={t("update")} icon="⇧" onClick={() => setTab("update")} />
+      <nav className="tabbar" id="tabbar" aria-label="main">
+        <span className="tab-ind" aria-hidden="true" />
+        <TabButton active={tab === "overview"} label={t("overview")} icon="speed" tab="overview" onClick={() => setTab("overview")} />
+        <TabButton active={tab === "rides"} label={t("recentRides")} icon="route" tab="rides" onClick={() => setTab("rides")} />
+        <TabButton active={tab === "network"} label={t("network")} icon="link" tab="network" onClick={() => setTab("network")} />
+        <TabButton active={tab === "device"} label={t("device")} icon="gear" tab="device" onClick={() => setTab("device")} />
+        <TabButton active={tab === "update"} label={t("update")} icon="download" tab="update" onClick={() => setTab("update")} />
       </nav>
-    </main>
+    </div>
+    </div>
   );
 }
 
@@ -943,12 +988,10 @@ function otaError(status: number, t: (key: keyof typeof I18N.zh) => string) {
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <article className="metric">
-      <span>{label}</span>
-      <strong>{value || "--"}</strong>
-    </article>
-  );
+  const number = value.match(/^(-?\d+(?:\.\d+)?)(.*)$/);
+  return <div className="stat"><span className="k">{label}</span><span className="v tnum">
+    {number ? <><span data-num={number[1]} data-key={`metric-${label}`}>{number[1]}</span><small>{number[2]}</small></> : value || "--"}
+  </span></div>;
 }
 
 function RideRecordList({ records, t }: { records: RideRecord[]; t: (key: keyof typeof I18N.zh) => string }) {
@@ -1033,11 +1076,14 @@ function validSection(section: unknown): section is ManifestSection {
   });
 }
 
-function TabButton({ active, icon, label, onClick }: { active: boolean; icon: string; label: string; onClick: () => void }) {
+function DashboardIcon({ name, size = 24 }: { name: string; size?: number }) {
+  return <span className="dashboard-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: dashboardIcon(name, size) }} />;
+}
+
+function TabButton({ active, icon, label, tab, onClick }: { active: boolean; icon: string; label: string; tab: Tab; onClick: () => void }) {
   return (
-    <button className={active ? "tab active" : "tab"} aria-current={active ? "page" : undefined} type="button" onClick={onClick}>
-      <span>{icon}</span>
-      {label}
+    <button className={active ? "tab sel" : "tab"} data-tab={tab} aria-label={label} aria-current={active ? "page" : undefined} type="button" onClick={onClick}>
+      <span className="pill"><DashboardIcon name={icon} size={22} /></span><span className="tab-label">{label}</span>
     </button>
   );
 }
