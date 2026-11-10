@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { dashboardIcon, socBar, bars } from "./vendor/dashboard-parts";
 import { bindDashboardMotion, updateDashboardMotion } from "./vendor/dashboard-motion";
 import { bindDashboardPages } from "./vendor/dashboard-swipe";
+import ClientUpdateCards, { UpdateCard } from "./UpdateCards";
+import { updateUrl } from "./update-source";
 import VehicleImage from "./VehicleImage";
 import { ThemeButton } from "./DashboardTheme";
 import DashboardSheet from "./DashboardSheet";
@@ -365,6 +367,8 @@ export default function App() {
   const [onlineFirmwares, setOnlineFirmwares] = useState<OnlineFirmware[]>([]);
   const [onlineFirmware, setOnlineFirmware] = useState<OnlineFirmware>();
   const [onlineLoading, setOnlineLoading] = useState(false);
+  const [firmwareCheck, setFirmwareCheck] = useState<"idle" | "checked" | "error">("idle");
+  const [firmwareCheckError, setFirmwareCheckError] = useState("");
   const [message, setMessage] = useState("未连接");
   const [busy, setBusy] = useState(false);
   const [ble, setBle] = useState<BleState>({});
@@ -785,12 +789,18 @@ export default function App() {
   async function loadOnlineFirmwares() {
     if (onlineLoading) return;
     setOnlineLoading(true);
+    setFirmwareCheckError("");
     try {
-      const response = await fetch(native ? "https://esp-bms-setting.vercel.app/firmware/firmware.json" : "/firmware/firmware.json", { cache: "no-store" });
+      const response = await fetch(updateUrl("firmware/firmware.json"), { cache: "no-store", signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = (await response.json()) as { firmwares?: OnlineFirmware[] };
+      if (!Array.isArray(data.firmwares)) throw new Error(language === "zh" ? "无效的固件更新清单" : "Invalid firmware manifest");
+      setFirmwareCheck("checked");
       setOnlineFirmwares(Array.isArray(data.firmwares) ? data.firmwares.map((item) => ({ ...item, url: new URL(item.url, response.url).href })) : []);
       if (!Array.isArray(data.firmwares) || data.firmwares.length === 0) setMessage(t("noOnlineFirmware"));
+    } catch (error) {
+      setFirmwareCheck("error");
+      setFirmwareCheckError(error instanceof Error ? error.message : String(error));
     } finally {
       setOnlineLoading(false);
     }
@@ -929,7 +939,6 @@ export default function App() {
             <button className="btn tonal" type="button" onClick={() => native.openNative("CAST")}>{t("cast")}</button>
             <button className="btn tonal" type="button" onClick={() => native.openNative("BMS")}>{t("deviceTools")}</button>
             <button className="btn tonal" type="button" onClick={() => native.openNative("RECORDS")}>{language === "zh" ? "原生记录与轨迹" : "Native records and tracks"}</button>
-            <button className="btn tonal" type="button" onClick={() => native.openNative("SETTINGS")}>{language === "zh" ? "App 更新" : "App update"}</button>
           </div>}
         </section>
         <section className="card stack settings-detail" aria-labelledby="settings-device-title">
@@ -944,14 +953,12 @@ export default function App() {
           </form>
         )) : <p className="empty">{language === "zh" ? "连接设备后显示配置项" : "Connect to the device to view settings"}</p>}
         </section>
-        <section className="card stack settings-detail" aria-labelledby="settings-update-title">
-          <div className="card-head"><span className="muted"><DashboardIcon name="download" size={20} /></span><h2 className="card-title" id="settings-update-title">{language === "zh" ? "更新" : "Updates"}</h2></div>
+        <ClientUpdateCards language={language} appInfo={appInfo} />
+        <UpdateCard title={language === "zh" ? "固件更新" : "Firmware update"} version={`${language === "zh" ? "当前面板" : "Current panel"} ${status.version || "—"}`} checking={onlineLoading} onCheck={() => void loadOnlineFirmwares()} status={onlineLoading ? (language === "zh" ? "正在检查…" : "Checking…") : firmwareCheck === "error" ? (language === "zh" ? "检查失败，点击重试" : "Failed; tap to retry") : firmwareCheck === "checked" ? (language === "zh" ? `找到 ${onlineFirmwares.length} 款固件` : `${onlineFirmwares.length} releases found`) : (language === "zh" ? "查找更新" : "Check for updates")}>
+        {firmwareCheckError && <p className="empty" role="status">{firmwareCheckError}</p>}
         <div className="stack">
           <h2>{t("onlineFirmware")}</h2>
           <div className="button-row">
-            <button type="button" disabled={busy || onlineLoading} onClick={() => void loadOnlineFirmwares()}>
-              {onlineLoading ? "…" : t("queryFirmware")}
-            </button>
             <select
               value={onlineFirmware?.profile || ""}
               disabled={busy || onlineFirmwares.length === 0}
@@ -965,7 +972,7 @@ export default function App() {
               ))}
             </select>
           </div>
-          <a className="app-download" href={native ? "https://esp-bms-setting.vercel.app/apk/两轮智控.apk" : "/apk/两轮智控.apk"} download>{t("appDownload")}</a>
+          <p className="card-sub">{language === "zh" ? "选择匹配硬件的固件后下载；刷写前仍需确认文件和验证码。" : "Download firmware matching your hardware, then confirm the file and verification code before flashing."}</p>
         </div>
         {manifest?.sections.filter((section) => section.id === "update").map((section) => (
           <form className="stack" key={section.id} onSubmit={submitFirmware}>
@@ -976,7 +983,7 @@ export default function App() {
             <button type="submit" disabled={busy || transport !== "http" || !firmwareFile || !/^[0-9]{4}$/.test(firmwareCode)}>{section.items[0]?.label[language]}</button>
           </form>
         ))}
-        </section>
+        </UpdateCard>
       </section>
 
       {tab !== "rides" && <p className="message" role="status">{busy ? <span className="loading-ring" aria-hidden="true" /> : message}</p>}

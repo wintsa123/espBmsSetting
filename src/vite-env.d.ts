@@ -43,6 +43,10 @@ interface RequestInit {
 interface Window {
   BmsNative?: {
     getAppInfo?: () => string;
+    getWebUpdateState?: () => string;
+    checkWebUpdate?: () => void;
+    restartWeb?: () => void;
+    installAppUpdate?: () => void;
     request: (id: string, method: string, path: string, body: string, host: string) => void;
     connectBle: () => void;
     bleConnected: () => boolean;
@@ -51,3 +55,5 @@ interface Window {
   __bmsNativeReply?: (id: string, payload: string) => void;
   bmsNativeRequest?: (method: string, path: string, body: string, host: string) => Promise<unknown>;
 }
+
+declare const __WEB_VERSION__: string;
