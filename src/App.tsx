@@ -1,15 +1,21 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-const CONTROL_SERVICE_UUID = "7b47f060-0f68-4ad2-9a25-7f3d36a6c7a1";
-const CONTROL_TX_UUID = "7b47f061-0f68-4ad2-9a25-7f3d36a6c7a1";
-const CONTROL_RX_UUID = "7b47f062-0f68-4ad2-9a25-7f3d36a6c7a1";
+const CONTROL_SERVICE_UUID = "4f91e100-23b2-4ee7-9f9a-86d1093f0a01";
+const CONTROL_TX_UUID = "4f91e100-23b2-4ee7-9f9a-86d1093f0a02";
+const CONTROL_RX_UUID = "4f91e100-23b2-4ee7-9f9a-86d1093f0a03";
 
 type Language = "zh" | "en";
 type Transport = "http" | "ble";
-type Tab = "overview" | "network" | "device" | "update";
+type Tab = "overview" | "rides" | "network" | "device" | "update";
 type JsonRecord = Record<string, unknown>;
 
 type Status = {
+  soc_percent?: number | null;
+  current_deci_amps?: number | null;
+  controller_power_w?: number | null;
+  controller_rpm?: number | null;
+  controller_temp_c?: number | null;
+  motor_temp_c?: number | null;
   version?: string;
   speed?: string;
   speed_unit?: string;
@@ -35,6 +41,8 @@ type RideRecord = {
   max_current?: RidePeak;
   max_delta?: RidePeak;
 };
+
+type RideSession = { id: number; start_s: number; elapsed_s: number; samples: number; calibrated: boolean; truncated: boolean };
 
 type RideRecordsResponse = { records?: RideRecord[] };
 
@@ -67,7 +75,7 @@ type OnlineFirmware = {
 };
 type ManifestItem = {
   id: string;
-  kind: "range" | "select" | "action" | "choice" | "upload";
+  kind: "range" | "select" | "action" | "choice" | "upload" | "map";
   label: Localized;
   value?: string | number | null;
   min?: number;
@@ -154,6 +162,17 @@ const I18N = {
     refresh: "刷新",
     rideRecord: "骑行记录",
     rideRecords: "骑行峰值记录",
+    recentRides: "最近骑行",
+    rideSessions: "骑行会话",
+    elapsed: "时长",
+    samples: "采样数",
+    localRecord: "设备记录",
+    noSessions: "暂无骑行会话",
+    sessionUnavailable: "骑行历史未能读取，请连接设备后刷新",
+    cast: "投屏",
+    deviceTools: "设备工具",
+    current: "电流",
+    power: "功率",
     readyToReboot: "待重启",
     saved: "已保存",
     saveDevice: "保存设备",
@@ -225,6 +244,17 @@ const I18N = {
     refresh: "Refresh",
     rideRecord: "Ride record",
     rideRecords: "Ride peak records",
+    recentRides: "Recent rides",
+    rideSessions: "Ride sessions",
+    elapsed: "Duration",
+    samples: "Samples",
+    localRecord: "Device record",
+    noSessions: "No ride sessions yet",
+    sessionUnavailable: "Ride history unavailable. Connect the device and refresh.",
+    cast: "Cast",
+    deviceTools: "Device tools",
+    current: "Current",
+    power: "Power",
     readyToReboot: "ready to reboot",
     saved: "Saved",
     saveDevice: "Save device",
@@ -264,7 +294,7 @@ const decoder = new TextDecoder();
 
 function CastLanding() {
   const deepLink = `fuckingbms://cast/v1${window.location.search}`;
-  const [english, setEnglish] = useState(false);
+  const english = new URLSearchParams(window.location.search).get("lang") === "en";
 
   useEffect(() => {
     const timer = window.setTimeout(() => { window.location.href = deepLink; }, 150);
@@ -273,7 +303,6 @@ function CastLanding() {
 
   return (
     <main className="cast-landing">
-      <button className="cast-language" onClick={() => setEnglish(!english)}>{english ? "中文" : "English"}</button>
       <p className="eyebrow">{english ? "BMS REMOTE CAST" : "BMS 远程投屏"}</p>
       <h1>{english ? "Opening the casting app…" : "正在打开投屏 App…"}</h1>
       <p>{english ? "The BMS casting app opens automatically when installed. Make sure the phone is connected to the device hotspot." : "已安装 BMS 投屏 App 时将自动打开。请确认手机已连接设备热点。"}</p>
@@ -300,6 +329,10 @@ export default function App() {
   const [manifest, setManifest] = useState<SettingsManifest>();
   const [settingsValues, setSettingsValues] = useState<Record<string, string>>({});
   const [candidates, setCandidates] = useState<BmsCandidate[]>([]);
+  const [sessions, setSessions] = useState<RideSession[]>([]);
+  const [historyAvailable, setHistoryAvailable] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const native = window.BmsNative;
   const [rideRecords, setRideRecords] = useState<RideRecord[]>([]);
   const [firmwareFile, setFirmwareFile] = useState<File>();
   const [firmwareCode, setFirmwareCode] = useState("");
@@ -311,8 +344,9 @@ export default function App() {
   const [ble, setBle] = useState<BleState>({});
   const transportRef = useRef<Transport>("http");
   const bleRef = useRef<BleState>({});
-  const pendingBle = useRef(new Map<string, PendingBle>());
-  const bleBuffer = useRef("");
+  const pendingBle = useRef(new Map<number, PendingBle>());
+  const bleBuffer = useRef(new Uint8Array(0));
+  const bleRequestId = useRef(0);
 
   const t = useMemo(() => {
     return (key: keyof typeof I18N.zh) => I18N[language][key] || I18N.zh[key] || key;
@@ -321,6 +355,45 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
   }, [language]);
+
+  useEffect(() => {
+    const pending = new Map<string, { resolve: (value: unknown) => void; reject: (reason: Error) => void; timer: number }>();
+    window.__bmsNativeReply = (id, payload) => {
+      const request = pending.get(id);
+      if (!request) return;
+      pending.delete(id);
+      window.clearTimeout(request.timer);
+      try {
+        const result = JSON.parse(payload);
+        if (result.ok) request.resolve(result.body);
+        else request.reject(new Error(result.error || "Device request failed"));
+      } catch (error) { request.reject(error instanceof Error ? error : new Error(String(error))); }
+    };
+    window.bmsNativeRequest = (method, path, body, host) => new Promise((resolve, reject) => {
+      const id = crypto.randomUUID();
+      const timer = window.setTimeout(() => { pending.delete(id); reject(new Error("Device request timed out")); }, 15000);
+      pending.set(id, { resolve, reject, timer });
+      try { native!.request(id, method, path, body, host); }
+      catch (error) { window.clearTimeout(timer); pending.delete(id); reject(error); }
+    });
+    return () => {
+      for (const request of pending.values()) { window.clearTimeout(request.timer); request.reject(new Error("Page closed")); }
+      delete window.__bmsNativeReply;
+      delete window.bmsNativeRequest;
+    };
+  }, [native]);
+
+  useEffect(() => {
+    if (!connected || busy) return;
+    let refreshing = false;
+    const timer = window.setInterval(async () => {
+      if (refreshing || document.hidden) return;
+      refreshing = true;
+      try { await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
+      finally { refreshing = false; }
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [connected, busy, baseUrl, transport]);
 
   function setCurrentTransport(next: Transport) {
     transportRef.current = next;
@@ -345,6 +418,9 @@ export default function App() {
   }
 
   async function api(path: string, options: RequestInit = {}): Promise<unknown> {
+    if (native && window.bmsNativeRequest) {
+      return window.bmsNativeRequest(options.method || "GET", path, String(options.body || ""), transportRef.current === "ble" ? "ble" : baseUrl);
+    }
     const currentBle = bleRef.current;
     if (transportRef.current === "ble" && currentBle.tx && currentBle.rx) {
       return bleApi(path, options);
@@ -353,6 +429,7 @@ export default function App() {
   }
 
   async function httpApi(path: string, options: RequestInit = {}): Promise<unknown> {
+    if (native && window.bmsNativeRequest) return window.bmsNativeRequest(options.method || "GET", path, String(options.body || ""), baseUrl);
     const headers = new Headers(options.headers || {});
     if (options.body && !headers.has("content-type")) headers.set("content-type", "application/json");
 
@@ -382,22 +459,26 @@ export default function App() {
   async function bleApi(path: string, options: RequestInit = {}) {
     const currentBle = bleRef.current;
     if (!currentBle.tx) throw new Error("BLE not connected");
-    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    if (pendingBle.current.size) throw new Error("蓝牙请求处理中，请稍后重试");
+    const id = bleRequestId.current = (bleRequestId.current % 0xffffffff) + 1;
     const request = {
+      v: 1,
       id,
       method: options.method || "GET",
       path,
-      body: options.body ? String(options.body) : "",
+      body: options.body ? JSON.parse(String(options.body)) : null,
     };
+    bleBuffer.current = new Uint8Array(0);
     const promise = new Promise((resolve, reject) => {
       const timer = window.setTimeout(() => {
         pendingBle.current.delete(id);
+        bleBuffer.current = new Uint8Array(0);
         reject(new Error("蓝牙请求超时"));
-      }, 8000);
+      }, 10000);
       pendingBle.current.set(id, { resolve, reject, timer });
     });
     try {
-      await writeBleText(currentBle.tx, JSON.stringify(request) + "\n");
+      await writeBleText(currentBle.tx, JSON.stringify(request));
     } catch (error) {
       const pending = pendingBle.current.get(id);
       if (pending) {
@@ -411,10 +492,15 @@ export default function App() {
 
   async function writeBleText(tx: BluetoothRemoteGATTCharacteristic, text: string) {
     const bytes = encoder.encode(text);
-    for (let offset = 0; offset < bytes.length; offset += 180) {
-      const chunk = bytes.slice(offset, offset + 180);
-      if (tx.writeValueWithoutResponse) {
-        await tx.writeValueWithoutResponse(chunk);
+    if (bytes.length > 512) throw new Error("蓝牙请求过大");
+    // Browsers do not expose ATT MTU; 19 payload bytes also fit the default MTU 23.
+    for (let offset = 0; offset < bytes.length; offset += 19) {
+      const payload = bytes.slice(offset, offset + 19);
+      const chunk = new Uint8Array(payload.length + 1);
+      chunk[0] = (offset === 0 ? 1 : 0) | (offset + 19 >= bytes.length ? 2 : 0);
+      chunk.set(payload, 1);
+      if (tx.writeValueWithResponse) {
+        await tx.writeValueWithResponse(chunk);
       } else if (tx.writeValue) {
         await tx.writeValue(chunk);
       } else {
@@ -426,28 +512,43 @@ export default function App() {
   function onBleValue(event: Event) {
     const target = event.target as unknown as BluetoothRemoteGATTCharacteristic;
     if (!target.value) return;
-    bleBuffer.current += decoder.decode(target.value);
-    let newline = bleBuffer.current.indexOf("\n");
-    while (newline >= 0) {
-      const line = bleBuffer.current.slice(0, newline).trim();
-      bleBuffer.current = bleBuffer.current.slice(newline + 1);
-      if (line) resolveBleLine(line);
-      newline = bleBuffer.current.indexOf("\n");
+    try {
+      const chunk = new Uint8Array(target.value.buffer, target.value.byteOffset, target.value.byteLength);
+      if (!chunk.length || (chunk[0] & 0xfc)) throw new Error("蓝牙响应分片无效");
+      if (chunk[0] & 1) bleBuffer.current = new Uint8Array(0);
+      else if (!bleBuffer.current.length) throw new Error("蓝牙响应缺少起始分片");
+      const bytes = new Uint8Array(bleBuffer.current.length + chunk.length - 1);
+      if (bytes.length > 4096) throw new Error("蓝牙响应过大");
+      bytes.set(bleBuffer.current);
+      bytes.set(chunk.subarray(1), bleBuffer.current.length);
+      bleBuffer.current = bytes;
+      if (chunk[0] & 2) {
+        bleBuffer.current = new Uint8Array(0);
+        resolveBleLine(decoder.decode(bytes));
+      }
+    } catch (error) {
+      bleBuffer.current = new Uint8Array(0);
+      for (const pending of pendingBle.current.values()) {
+        window.clearTimeout(pending.timer);
+        pending.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+      pendingBle.current.clear();
     }
   }
 
   function resolveBleLine(line: string) {
-    const message = JSON.parse(line) as { id?: string; status?: number; error?: string; body?: string };
+    const message = JSON.parse(line) as { id?: number; status?: number; body?: unknown };
+    if (!Number.isInteger(message.id) || !Number.isInteger(message.status)) throw new Error("蓝牙响应格式无效");
     if (!message.id) return;
     const pending = pendingBle.current.get(message.id);
     if (!pending) return;
     window.clearTimeout(pending.timer);
     pendingBle.current.delete(message.id);
-    if ((message.status || 200) >= 400) {
-      pending.reject(new Error(message.error || `BLE ${message.status}`));
+    if (message.status! < 200 || message.status! >= 300) {
+      pending.reject(new Error(`BLE ${message.status}: ${String(message.body || "")}`));
       return;
     }
-    pending.resolve(parseMaybeJson(message.body || ""));
+    pending.resolve(message.body);
   }
 
   async function connectHttp() {
@@ -460,6 +561,18 @@ export default function App() {
 
   async function connectBle() {
     await run("BLE", async () => {
+      if (native) {
+        native.connectBle();
+        const deadline = Date.now() + 60000;
+        while (!native.bleConnected()) {
+          if (Date.now() > deadline) throw new Error(t("disconnected"));
+          await new Promise((resolve) => window.setTimeout(resolve, 500));
+        }
+        setCurrentTransport("ble");
+        await loadManifest();
+        await refresh();
+        return;
+      }
       if (!navigator.bluetooth) throw new Error(t("bluetoothUnsupported"));
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
@@ -479,20 +592,34 @@ export default function App() {
       await rx.startNotifications();
       rx.addEventListener("characteristicvaluechanged", onBleValue);
       device.addEventListener("gattserverdisconnected", () => {
+        for (const request of pendingBle.current.values()) { window.clearTimeout(request.timer); request.reject(new Error(t("disconnected"))); }
+        pendingBle.current.clear();
+        bleBuffer.current = new Uint8Array();
+        setConnected(false);
+        setStatus({});
         setCurrentBle({});
         setCurrentTransport("http");
         setMessage(t("disconnected"));
       });
       setCurrentBle({ tx, rx, deviceName: device.name || device.id });
       setCurrentTransport("ble");
-      await loadConfig();
+      await loadManifest();
       await refresh();
     });
   }
 
   async function refresh() {
-    const data = (await api("/api/status")) as Status;
+    let data: Status;
+    try { data = (await api("/api/status")) as Status; }
+    catch (error) { setConnected(false); setStatus({}); setSessions([]); setRideRecords([]); setHistoryAvailable(false); throw error; }
     setStatus(data);
+    setConnected(true);
+    try {
+      const history = (await api("/api/history/sessions")) as { ready?: boolean; sessions?: RideSession[] };
+      setSessions(Array.isArray(history.sessions) ? [...history.sessions].sort((a, b) => b.id - a.id) : []);
+      setHistoryAvailable(history.ready === true);
+    } catch { setSessions([]); setHistoryAvailable(false); }
+    if (transportRef.current === "ble") { setRideRecords([]); return; }
     try {
       const history = (await httpApi("/api/bms/ride-records")) as RideRecordsResponse;
       setRideRecords(Array.isArray(history.records) ? history.records : []);
@@ -519,7 +646,7 @@ export default function App() {
     setManifest(undefined);
     setSettingsValues({});
     try {
-      const data = (await httpApi("/api/settings/manifest")) as SettingsManifest;
+      const data = (await api("/api/settings/manifest")) as SettingsManifest;
       if (data.protocol_version !== 1 || !Array.isArray(data.sections) || !data.sections.every(validSection)) {
         throw new Error("固件不支持动态设置，请升级");
       }
@@ -549,6 +676,7 @@ export default function App() {
     event.preventDefault();
     const body = Object.fromEntries(new FormData(event.currentTarget)) as { password?: string };
     void run(t("saved"), async () => {
+      if (!/^[0-9]{8}$/.test(body.password || "")) throw new Error(language === "zh" ? "密码必须为 8 位数字" : "Password must contain 8 digits");
       await post("/api/ap-password", body);
     });
   };
@@ -632,10 +760,10 @@ export default function App() {
     if (onlineLoading) return;
     setOnlineLoading(true);
     try {
-      const response = await fetch("/firmware/firmware.json", { cache: "no-store" });
+      const response = await fetch(native ? "https://esp-bms-setting.vercel.app/firmware/firmware.json" : "/firmware/firmware.json", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = (await response.json()) as { firmwares?: OnlineFirmware[] };
-      setOnlineFirmwares(Array.isArray(data.firmwares) ? data.firmwares : []);
+      setOnlineFirmwares(Array.isArray(data.firmwares) ? data.firmwares.map((item) => ({ ...item, url: new URL(item.url, response.url).href })) : []);
       if (!Array.isArray(data.firmwares) || data.firmwares.length === 0) setMessage(t("noOnlineFirmware"));
     } finally {
       setOnlineLoading(false);
@@ -664,6 +792,8 @@ export default function App() {
   const battery = formatMillivolts(status.pack_voltage_mv ?? status.local_battery_mv);
   const connection = transport === "ble" ? `BLE ${ble.deviceName || ""}`.trim() : normalizeBaseUrl(baseUrl);
 
+  const soc = typeof status.soc_percent === "number" && Number.isFinite(status.soc_percent) ? Math.max(0, Math.min(100, status.soc_percent)) : null;
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -676,31 +806,37 @@ export default function App() {
         </button>
       </header>
 
-      <section className="hero">
-        <div>
-          <span>{t("firmware")}</span>
-          <strong>{status.version || "--"}</strong>
-        </div>
-        <div>
-          <span>{t("wifi")}</span>
-          <strong>{formatState(status.wifi, t)}</strong>
-        </div>
-      </section>
-
-      <section className="quick-actions">
-        <button type="button" disabled={busy} onClick={() => void connectHttp()}>
-          {t("connectHttp")}
-        </button>
-        <button className="secondary" type="button" disabled={busy} onClick={() => void connectBle()}>
-          {t("connectBle")}
-        </button>
-      </section>
-
       <section className={tab === "overview" ? "panel active" : "panel"}>
-        <Metric label={t("speed")} value={`${status.speed || "--"} ${status.speed_unit || ""}`.trim()} />
-        <Metric label={t("battery")} value={battery} />
-        <Metric label={t("bms")} value={formatState(status.bms, t)} />
-        <Metric label="OTA" value={formatState(status.ota, t)} />
+        <article className="card hero-card">
+          <div className="hero-top"><span className={`chip${connected ? " accent" : ""}`}>{t(connected ? "connected" : "disconnected")}</span><span className="chip">{transport === "ble" ? "Bluetooth" : "Wi-Fi"}</span><span className="spacer" /><span className="hero-title">ESP32 BMS GPS</span></div>
+          <div className="hero-stage">
+            <div className="bignum left"><b className="tnum">{soc ?? "—"}<i>%</i></b><span>{t("battery")}</span></div>
+            <svg className="hero-pic" viewBox="0 0 240 160" role="img" aria-label={t("overview")}><circle cx="48" cy="117" r="27" fill="none" stroke="currentColor" strokeWidth="9"/><circle cx="194" cy="117" r="27" fill="none" stroke="currentColor" strokeWidth="9"/><path d="M48 117l36-61h47l39 61H91L67 79m64-23 17-20h24m-37 29h32l27 52M81 51h39" fill="none" stroke="currentColor" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <div className="bignum right volt"><b className="tnum">{battery.replace(/ V$/, "")}<i>V</i></b><span>{t("battery")}</span></div>
+          </div>
+          <div className="soc-track" role="progressbar" aria-label={t("battery")} aria-valuenow={soc ?? undefined} aria-valuemin={0} aria-valuemax={100}><div style={{ width: `${soc ?? 0}%` }} /></div>
+          <div className="hero-meta"><span>{t("firmware")} {status.version || "—"}</span><span>{t("bms")} {formatState(status.bms, t)}</span></div>
+        </article>
+        <div className="hero-grid grid2">
+          <Metric label={t("speed")} value={`${status.speed ?? "—"} ${status.speed_unit || "km/h"}`} />
+          <Metric label={t("current")} value={formatDeciAmps(status.current_deci_amps)} />
+          <Metric label={t("power")} value={status.controller_power_w == null ? "—" : `${status.controller_power_w} W`} />
+          <Metric label={t("bmsCapacityEstimate")} value={formatBmsCapacityEstimate(status, t)} />
+        </div>
+        <section className="quick-actions">
+          <button type="button" disabled={busy} onClick={() => void connectHttp()}>{t("connectHttp")}</button>
+          <button className="secondary" type="button" disabled={busy} onClick={() => void connectBle()}>{t("connectBle")}</button>
+          {native && <button type="button" onClick={() => native.openNative("CAST")}>{t("cast")}</button>}
+          {native && <button className="secondary" type="button" onClick={() => native.openNative("BMS")}>{t("deviceTools")}</button>}
+        </section>
+        <section className="card ride-card recent-rides">
+          <div className="section-head"><h2>{t("recentRides")}</h2><button className="icon-button" type="button" onClick={() => setTab("rides")} aria-label={t("rideSessions")}>→</button></div>
+          <SessionList sessions={sessions.slice(0, 2)} language={language} t={t} available={historyAvailable} />
+        </section>
+      </section>
+
+      <section className={tab === "rides" ? "panel active" : "panel"}>
+        <section className="card"><h2>{t("recentRides")}</h2><SessionList sessions={sessions} language={language} t={t} available={historyAvailable} /></section>
         <RideRecordList records={rideRecords} t={t} />
       </section>
 
@@ -723,104 +859,25 @@ export default function App() {
         <form className="stack" onSubmit={submitApPassword}>
           <label>
             <span>{t("apPassword")}</span>
-            <input name="password" type="password" minLength={8} maxLength={64} autoComplete="new-password" />
+            <input name="password" type="password" minLength={8} maxLength={8} inputMode="numeric" pattern="[0-9]{8}" autoComplete="new-password" required />
           </label>
-          <button type="submit" disabled={busy}>
+          <button type="submit" disabled={busy || transport === "ble"}>
             {t("setupAp")}
           </button>
         </form>
       </section>
 
       <section className={tab === "device" ? "panel active" : "panel"}>
+        {native && <button type="button" onClick={() => native.openNative("SETTINGS")}>{t("deviceTools")}</button>}
         {manifest ? manifest.sections.filter((section) => section.id !== "update").map((section) => (
           <form className="stack" key={section.id} onSubmit={(event) => submitSection(section, event)}>
             <h2>{section.label[language]}</h2>
-            {section.items.map((item) => <ManifestControl key={item.id} item={item} language={language} busy={busy} value={settingsValues[item.id] || ""} candidates={candidates} onValue={(value) => setSettingsValues({ ...settingsValues, [item.id]: value })} onAction={() => runAction(item)} onLoadChoices={() => loadChoices(item)} onSubmitChoice={() => submitChoice(item)} />)}
+            {transport === "ble" && section.items.some((item) => ["action", "choice", "map"].includes(item.kind)) && <p className="empty">{language === "zh" ? "此功能需要连接设备热点" : "Connect to the device hotspot to use this feature"}</p>}
+            {section.items.map((item) => <ManifestControl key={item.id} item={item} language={language} busy={busy || (transport === "ble" && ["action", "choice", "map"].includes(item.kind))} value={settingsValues[item.id] || ""} candidates={candidates} onValue={(value) => setSettingsValues({ ...settingsValues, [item.id]: value })} onAction={() => runAction(item)} onLoadChoices={() => loadChoices(item)} onSubmitChoice={() => submitChoice(item)} loadTrack={async () => await api(item.endpoint!) as { points?: TrackPoint[] }} />)}
             {section.items.some((item) => item.id === "bms_type") && <Metric label={t("bmsCapacityEstimate")} value={formatBmsCapacityEstimate(status, t)} />}
             {section.submit && <button type="submit" disabled={busy}>{t("saveDevice")}</button>}
           </form>
         )) : <p className="empty">{message || "固件不支持动态设置，请升级"}</p>}
-        {/*
-        <form className="stack" onSubmit={submitDevice}>
-          <label>
-            <span>{t("brightness")}: {config.brightness ?? 80}%</span>
-            <input
-              name="brightness"
-              type="range"
-              min={10}
-              max={100}
-              value={config.brightness ?? 80}
-              onChange={(event) => setConfig({ ...config, brightness: Number(event.target.value) })}
-            />
-          </label>
-          <label>
-            <span>{t("volume")}: {config.volume ?? 60}%</span>
-            <input
-              name="volume"
-              type="range"
-              min={0}
-              max={100}
-              value={config.volume ?? 60}
-              onChange={(event) => setConfig({ ...config, volume: Number(event.target.value) })}
-            />
-          </label>
-          <label>
-            <span>{t("screenRotation")}</span>
-            <select name="display_rotation" value={config.display_rotation || "landscape"} onChange={(event) => setConfig({ ...config, display_rotation: event.target.value })}>
-              <option value="portrait">竖屏</option>
-              <option value="landscape">横屏</option>
-              <option value="inverted_portrait">反向竖屏</option>
-              <option value="inverted_landscape">反向横屏</option>
-            </select>
-          </label>
-          <label>
-            <span>{t("speedUnit")}</span>
-            <select name="speed_unit" value={config.speed_unit || "km/h"} onChange={(event) => setConfig({ ...config, speed_unit: event.target.value })}>
-              <option>km/h</option>
-              <option>mph</option>
-            </select>
-          </label>
-          <label>
-            <span>{t("language")}</span>
-            <select
-              name="language"
-              value={language}
-              onChange={(event) => {
-                const value = event.target.value === "en" ? "en" : "zh";
-                setLanguage(value);
-                setConfig({ ...config, language: value });
-              }}
-            >
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
-          </label>
-          <label>
-            <span>BMS MAC</span>
-            <input name="bms_mac" value={config.bms_mac || ""} placeholder="AA:BB:CC:DD:EE:FF" onChange={(event) => setConfig({ ...config, bms_mac: event.target.value })} />
-          </label>
-          <label>
-            <span>{t("bmsType")}</span>
-            <select name="bms_type" value={config.bms_type || "ant"} onChange={(event) => setConfig({ ...config, bms_type: event.target.value as Config["bms_type"] })}>
-              <option value="ant">蚂蚁 ANT</option>
-              <option value="jk">极空 JK</option>
-              <option value="jbd">嘉佰达 JBD</option>
-              <option value="daly">达锂 Daly</option>
-            </select>
-          </label>
-          <div className="button-row">
-            <button type="button" disabled={busy} onClick={() => void run(t("scanBms"), async () => { await post("/api/bms/scan"); await loadBmsCandidates(); })}>
-              {t("scanBms")}
-            </button>
-            <button className="secondary" type="button" disabled={busy || !config.bms_mac} onClick={() => void run(t("bindBms"), async () => { await post("/api/bms/bind", { mac: config.bms_mac || "" }); await loadBmsCandidates(); })}>
-              {t("bindBms")}
-            </button>
-          </div>
-          <CandidateList candidates={candidates} emptyLabel={t("noCandidates")} onPick={(mac) => setConfig({ ...config, bms_mac: mac })} />
-          <button type="submit" disabled={busy}>
-            {t("saveDevice")}
-          </button>
-        </form> */}
       </section>
 
       <section className={tab === "update" ? "panel active" : "panel"}>
@@ -843,62 +900,39 @@ export default function App() {
               ))}
             </select>
           </div>
-          <a className="app-download" href="/apk/两轮智控.apk" download>{t("appDownload")}</a>
+          <a className="app-download" href={native ? "https://esp-bms-setting.vercel.app/apk/两轮智控.apk" : "/apk/两轮智控.apk"} download>{t("appDownload")}</a>
         </div>
         {manifest?.sections.filter((section) => section.id === "update").map((section) => (
           <form className="stack" key={section.id} onSubmit={submitFirmware}>
             <h2>{section.label[language]}</h2>
             <ManifestControl item={section.items[0]} language={language} busy={busy} value="" candidates={[]} onValue={() => {}} onAction={() => {}} onLoadChoices={() => {}} onSubmitChoice={() => {}} />
-            <label><span>固件文件</span><input type="file" accept={section.items[0]?.accept} required onChange={(event) => { setFirmwareFile(event.target.files?.[0]); setFirmwareCode(""); }} /></label>
-            <label><span>固件验证码</span><input value={firmwareCode} inputMode="numeric" minLength={4} maxLength={4} required onChange={(event) => setFirmwareCode(event.target.value.replace(/\D/g, "").slice(0, 4))} /></label>
+            <label><span>{t("firmwareFile")}</span><input type="file" accept={section.items[0]?.accept} required onChange={(event) => { setFirmwareFile(event.target.files?.[0]); setFirmwareCode(""); }} /></label>
+            <label><span>{t("firmwareCode")}</span><input value={firmwareCode} inputMode="numeric" minLength={4} maxLength={4} required onChange={(event) => setFirmwareCode(event.target.value.replace(/\D/g, "").slice(0, 4))} /></label>
             <button type="submit" disabled={busy || transport !== "http" || !firmwareFile || !/^[0-9]{4}$/.test(firmwareCode)}>{section.items[0]?.label[language]}</button>
           </form>
         ))}
-        {/* <form className="stack" onSubmit={submitFirmware}>
-          <Metric label="OTA" value={formatState(status.ota, t)} />
-          <p className="empty">{t("otaPurpose")}</p>
-          <label>
-            <span>{t("firmwareFile")}</span>
-            <input
-              type="file"
-              accept=".bin,application/octet-stream"
-              required
-              onChange={(event) => {
-                setFirmwareFile(event.target.files?.[0]);
-                setFirmwareCode("");
-              }}
-            />
-          </label>
-          <label>
-            <span>{t("firmwareCode")}</span>
-            <input
-              value={firmwareCode}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              minLength={4}
-              maxLength={4}
-              pattern="[0-9]{4}"
-              required
-              onChange={(event) => setFirmwareCode(event.target.value.replace(/\D/g, "").slice(0, 4))}
-            />
-          </label>
-          {transport !== "http" && <p className="empty">{t("otaHttpOnly")}</p>}
-          <button type="submit" disabled={busy || transport !== "http" || !firmwareFile || !/^[0-9]{4}$/.test(firmwareCode)}>
-            {t("uploadFirmware")}
-          </button>
-        </form> */}
       </section>
 
       <p className="message">{busy ? "..." : message}</p>
 
-      <nav className="tabs" aria-label="main">
+      <nav className="tabs tabbar" aria-label="main">
         <TabButton active={tab === "overview"} label={t("overview")} icon="⌁" onClick={() => setTab("overview")} />
+        <TabButton active={tab === "rides"} label={t("recentRides")} icon="▥" onClick={() => setTab("rides")} />
         <TabButton active={tab === "network"} label={t("network")} icon="⇄" onClick={() => setTab("network")} />
         <TabButton active={tab === "device"} label={t("device")} icon="⚙" onClick={() => setTab("device")} />
         <TabButton active={tab === "update"} label={t("update")} icon="⇧" onClick={() => setTab("update")} />
       </nav>
     </main>
   );
+}
+
+function SessionList({ sessions, language, t, available }: { sessions: RideSession[]; language: Language; t: (key: keyof typeof I18N.zh) => string; available: boolean }) {
+  if (!available) return <p className="empty">{t("sessionUnavailable")}</p>;
+  if (!sessions.length) return <p className="empty">{t("noSessions")}</p>;
+  return <div className="ride-records">{sessions.map((session) => <article className="ride-record" key={session.id}>
+    <strong>{session.calibrated && session.start_s > 0 ? new Date(session.start_s * 1000).toLocaleString(language === "zh" ? "zh-CN" : "en-US") : `${t("localRecord")} #${session.id}`}</strong>
+    <div className="grid2"><Metric label={t("elapsed")} value={`${Math.floor(session.elapsed_s / 60)}m ${session.elapsed_s % 60}s`} /><Metric label={t("samples")} value={String(session.samples)} /></div>
+  </article>)}</div>;
 }
 
 function otaError(status: number, t: (key: keyof typeof I18N.zh) => string) {
@@ -959,14 +993,33 @@ function CandidateList({ candidates, emptyLabel, onPick }: { candidates: BmsCand
   );
 }
 
-function ManifestControl({ item, language, busy, value, candidates, onValue, onAction, onLoadChoices, onSubmitChoice }: {
+type TrackPoint = { lat_e7: number; lon_e7: number };
+
+function TrackPreview({ load, language, disabled }: { load: () => Promise<{ points?: TrackPoint[] }>; language: Language; disabled: boolean }) {
+  const [points, setPoints] = useState<TrackPoint[]>([]);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const xs = points.map((p) => p.lon_e7), ys = points.map((p) => p.lat_e7);
+  const minX = Math.min(...xs), minY = Math.min(...ys);
+  const scale = Math.max(Math.max(...xs) - minX, Math.max(...ys) - minY, 1);
+  const line = points.map((p) => `${10 + (p.lon_e7 - minX) / scale * 280},${290 - (p.lat_e7 - minY) / scale * 280}`).join(" ");
+  return <div className="stack"><button type="button" disabled={loading || disabled} onClick={async () => {
+    setLoading(true);
+    try { const data = await load(); const valid = (data.points || []).filter((p) => Number.isFinite(p.lat_e7) && Number.isFinite(p.lon_e7) && Math.abs(p.lat_e7) <= 900000000 && Math.abs(p.lon_e7) <= 1800000000); setPoints(valid); setMessage(valid.length ? "" : language === "zh" ? "暂无 GPS 轨迹" : "No GPS track yet"); }
+    catch (error) { setMessage(String(error)); } finally { setLoading(false); }
+  }}>{language === "zh" ? "读取 GPS 轨迹" : "Load GPS track"}</button>{points.length > 0 && <svg viewBox="0 0 300 300" role="img" aria-label={language === "zh" ? "GPS 轨迹" : "GPS track"}><polyline points={line} fill="none" stroke="currentColor" strokeWidth="3" /></svg>}<p className="empty" role="status">{message}</p></div>;
+}
+
+function ManifestControl({ item, language, busy, value, candidates, onValue, onAction, onLoadChoices, onSubmitChoice, loadTrack }: {
   item: ManifestItem; language: Language; busy: boolean; value: string; candidates: BmsCandidate[];
+  loadTrack?: () => Promise<{ points?: TrackPoint[] }>;
   onValue: (value: string) => void; onAction: () => void; onLoadChoices: () => void; onSubmitChoice: () => void;
 }) {
+  if (item.kind === "map") return loadTrack ? <TrackPreview load={loadTrack} language={language} disabled={busy} /> : null;
   if (item.kind === "range") return <label><span>{item.label[language]}: {value}</span><input name={item.id} type="range" min={item.min} max={item.max} step={item.step} value={value} onChange={(event) => onValue(event.target.value)} /></label>;
   if (item.kind === "select") return <label><span>{item.label[language]}</span><select name={item.id} value={value} onChange={(event) => onValue(event.target.value)}>{item.options?.map((option) => <option key={option.value} value={option.value}>{option.label[language]}</option>)}</select></label>;
   if (item.kind === "action") return <button type="button" disabled={busy} onClick={onAction}>{item.label[language]}</button>;
-  if (item.kind === "choice") return <><label><span>{item.label[language]}</span><input value={value} onChange={(event) => onValue(event.target.value)} /></label><div className="button-row"><button type="button" disabled={busy} onClick={onLoadChoices}>扫描</button><button className="secondary" type="button" disabled={busy || !value} onClick={onSubmitChoice}>绑定</button></div><CandidateList candidates={candidates} emptyLabel="暂无候选设备" onPick={onValue} /></>;
+  if (item.kind === "choice") return <><label><span>{item.label[language]}</span><input value={value} onChange={(event) => onValue(event.target.value)} /></label><div className="button-row"><button type="button" disabled={busy} onClick={onLoadChoices}>{language === "zh" ? "扫描" : "Scan"}</button><button className="secondary" type="button" disabled={busy || !value} onClick={onSubmitChoice}>{language === "zh" ? "绑定" : "Bind"}</button></div><CandidateList candidates={candidates} emptyLabel={language === "zh" ? "暂无候选设备" : "No devices found"} onPick={onValue} /></>;
   return null;
 }
 
@@ -976,13 +1029,13 @@ function validSection(section: unknown): section is ManifestSection {
   return typeof value.id === "string" && !!value.label && typeof value.label.zh === "string" && typeof value.label.en === "string" && Array.isArray(value.items) && value.items.every((item) => {
     if (!item || typeof item !== "object") return false;
     const candidate = item as Partial<ManifestItem>;
-    return typeof candidate.id === "string" && ["range", "select", "action", "choice", "upload"].includes(String(candidate.kind)) && !!candidate.label && typeof candidate.label.zh === "string" && typeof candidate.label.en === "string";
+    return typeof candidate.id === "string" && ["range", "select", "action", "choice", "upload", "map"].includes(String(candidate.kind)) && !!candidate.label && typeof candidate.label.zh === "string" && typeof candidate.label.en === "string";
   });
 }
 
 function TabButton({ active, icon, label, onClick }: { active: boolean; icon: string; label: string; onClick: () => void }) {
   return (
-    <button className={active ? "tab active" : "tab"} type="button" onClick={onClick}>
+    <button className={active ? "tab active" : "tab"} aria-current={active ? "page" : undefined} type="button" onClick={onClick}>
       <span>{icon}</span>
       {label}
     </button>
@@ -1005,6 +1058,7 @@ function formatBmsCapacityEstimate(status: Status, t: (key: keyof typeof I18N.zh
   if (status.bms_capacity_estimate_state === "ready" && Number.isFinite(status.bms_capacity_estimate_mah)) {
     return `${((status.bms_capacity_estimate_mah as number) / 1000).toFixed(1)} Ah`;
   }
+  if (!status.bms_capacity_estimate_state) return "--";
   return status.bms_capacity_estimate_state === "unsupported" ? t("capacityUnsupported") : t("capacityEstimating");
 }
 

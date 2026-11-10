@@ -3,6 +3,7 @@
 type BluetoothRemoteGATTCharacteristic = {
   value?: DataView;
   writeValue?: (value: BufferSource) => Promise<void>;
+  writeValueWithResponse?: (value: BufferSource) => Promise<void>;
   writeValueWithoutResponse?: (value: BufferSource) => Promise<void>;
   startNotifications: () => Promise<BluetoothRemoteGATTCharacteristic>;
   addEventListener: (type: "characteristicvaluechanged", listener: EventListener) => void;
@@ -37,4 +38,15 @@ interface Navigator {
 
 interface RequestInit {
   targetAddressSpace?: "local" | "private";
+}
+
+interface Window {
+  BmsNative?: {
+    request: (id: string, method: string, path: string, body: string, host: string) => void;
+    connectBle: () => void;
+    bleConnected: () => boolean;
+    openNative: (route: string) => void;
+  };
+  __bmsNativeReply?: (id: string, payload: string) => void;
+  bmsNativeRequest?: (method: string, path: string, body: string, host: string) => Promise<unknown>;
 }
