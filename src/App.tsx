@@ -13,7 +13,7 @@ const CONTROL_RX_UUID = "4f91e100-23b2-4ee7-9f9a-86d1093f0a03";
 type Language = "zh" | "en";
 type Transport = "http" | "ble";
 type Tab = "overview" | "rides" | "device";
-type DeviceSheet = "bluetooth" | "wifi" | "system" | "settings" | "update" | "history";
+type DeviceSheet = "history";
 type JsonRecord = Record<string, unknown>;
 
 type Status = {
@@ -841,7 +841,7 @@ export default function App() {
           </button>
           <ThemeButton language={language} />
         </div>
-        <div className="topbar-page-title" role="heading" aria-level={1} aria-hidden="true">{tab === "rides" ? (language === "zh" ? "功能" : "Features") : tab === "device" ? (language === "zh" ? "我的" : "Mine") : (language === "zh" ? "爱车" : "Vehicle")}</div>
+        <div className="topbar-page-title" role="heading" aria-level={1} aria-hidden="true">{tab === "rides" ? (language === "zh" ? "功能" : "Features") : tab === "device" ? (language === "zh" ? "设置" : "Settings") : (language === "zh" ? "爱车" : "Vehicle")}</div>
       </header>
       <div className="loadbar" id="loadbar" aria-hidden="true" />
       <div className="scroll" id="scroll">
@@ -881,31 +881,17 @@ export default function App() {
 
       <section className={tab === "rides" ? "panel page active" : "panel page"} aria-label={language === "zh" ? "功能" : "Features"} />
 
-      <section className={tab === "device" ? "panel page active" : "panel page"}>
-        <SettingsRow icon="bt" title={language === "zh" ? "蓝牙连接" : "Bluetooth connection"} description={transport === "ble" && connected ? t("connected") : t("disconnected")} onClick={() => setDeviceSheet("bluetooth")} />
-        <SettingsRow icon="wifi" title={language === "zh" ? "Wi-Fi 连接" : "Wi-Fi connection"} description={transport === "http" && connected ? t("connected") : t("disconnected")} onClick={() => setDeviceSheet("wifi")} />
-        <SettingsRow icon="info" title={language === "zh" ? "系统信息" : "System information"} description={language === "zh" ? "面板与 App 版本" : "Panel and app versions"} onClick={() => setDeviceSheet("system")} />
-      </section>
-
-      {tab !== "rides" && <p className="message" role="status">{busy ? <span className="loading-ring" aria-hidden="true" /> : message}</p>}
-      </div>
-
-      <nav className="tabbar" id="tabbar" aria-label="main">
-        <span className="tab-ind" aria-hidden="true" />
-        <TabButton active={tab === "overview"} label={language === "zh" ? "爱车" : "Vehicle"} icon="speed" tab="overview" onClick={() => setTab("overview")} />
-        <TabButton active={tab === "rides"} label={language === "zh" ? "功能" : "Features"} icon="route" tab="rides" onClick={() => setTab("rides")} />
-        <TabButton active={tab === "device"} label={language === "zh" ? "我的" : "Mine"} icon="gear" tab="device" onClick={() => setTab("device")} />
-      </nav>
-      <DashboardSheet open={deviceSheet !== null} title={deviceSheet === "bluetooth" ? (language === "zh" ? "蓝牙连接" : "Bluetooth connection") : deviceSheet === "wifi" ? (language === "zh" ? "Wi-Fi 连接" : "Wi-Fi connection") : deviceSheet === "settings" ? t("device") : deviceSheet === "update" ? t("update") : deviceSheet === "history" ? (language === "zh" ? "行驶历史" : "Ride history") : (language === "zh" ? "系统信息" : "System information")} closeLabel={language === "zh" ? "关闭" : "Close"} onClose={() => setDeviceSheet(null)}>
-        <div className="device-forms">
-        {deviceSheet === "bluetooth" && <section className="stack">
+      <section className={tab === "device" ? "panel page active" : "panel page"} aria-label={language === "zh" ? "设置" : "Settings"}>
+        <section className="card stack settings-detail" aria-labelledby="settings-bluetooth-title">
+          <div className="card-head"><span className="muted"><DashboardIcon name="bt" size={20} /></span><h2 className="card-title" id="settings-bluetooth-title">{language === "zh" ? "蓝牙连接" : "Bluetooth connection"}</h2></div>
           <Metric label={language === "zh" ? "设备蓝牙" : "Device Bluetooth"} value={transport === "ble" && connected ? t("connected") : t("disconnected")} />
           <p className="empty">{language === "zh" ? "连接两轮智控面板，读取车辆状态并修改设备设置。" : "Connect to the panel to read vehicle status and change device settings."}</p>
           <button className="btn" type="button" disabled={busy} onClick={() => void connectBle()}>{t("connectBle")}</button>
-          <button className="btn tonal" type="button" onClick={() => setDeviceSheet("settings")}>{t("device")}</button>
-        </section>}
-        {deviceSheet === "wifi" && <>
+        </section>
+        <section className="card stack settings-detail" aria-labelledby="settings-wifi-title">
+          <div className="card-head"><span className="muted"><DashboardIcon name="wifi" size={20} /></span><h2 className="card-title" id="settings-wifi-title">{language === "zh" ? "Wi-Fi 连接" : "Wi-Fi connection"}</h2></div>
         <div className="stack">
+          <Metric label={language === "zh" ? "连接状态" : "Connection"} value={transport === "http" && connected ? t("connected") : t("disconnected")} />
           <label>
             <span>{t("deviceAddress")}</span>
             <input value={baseUrl} inputMode="url" onChange={(event) => setBaseUrl(event.target.value)} />
@@ -922,15 +908,13 @@ export default function App() {
             {t("setupAp")}
           </button>
         </form>
-        </>}
-        {deviceSheet === "system" && <>
+        </section>
+        <section className="card stack settings-detail" aria-labelledby="settings-system-title">
+          <div className="card-head"><span className="muted"><DashboardIcon name="info" size={20} /></span><h2 className="card-title" id="settings-system-title">{language === "zh" ? "系统信息" : "System information"}</h2></div>
           <section className="stack version-list">
             <div className="kv"><span className="k">{language === "zh" ? "面板版本" : "Panel version"}</span><span className="v">{status.version || "—"}</span></div>
             <div className="kv"><span className="k">{language === "zh" ? "App 版本" : "App version"}</span><span className="v">{native ? (appInfo.versionName ? `${appInfo.versionName}${appInfo.versionCode ? ` (${appInfo.versionCode})` : ""}` : "—") : (language === "zh" ? "网页预览" : "Web preview")}</span></div>
           </section>
-          <SettingsRow icon="gear" title={t("device")} onClick={() => setDeviceSheet("settings")} />
-          <SettingsRow icon="download" title={t("update")} onClick={() => setDeviceSheet("update")} />
-          <SettingsRow icon="route" title={language === "zh" ? "行驶历史" : "Ride history"} onClick={() => setDeviceSheet("history")} />
           <section className="stack"><h2>{language === "zh" ? "控制器状态" : "Controller status"}</h2><div className="grid2">
             <Metric label={language === "zh" ? "连接状态" : "Connection"} value={status.controller_online == null ? "—" : t(status.controller_online ? "connected" : "disconnected")} />
             <Metric label={language === "zh" ? "挡位" : "Gear"} value={status.controller_gear == null ? "—" : status.controller_gear === 0 ? "N" : status.controller_gear === 1 ? "D" : status.controller_gear === 2 ? "R" : String(status.controller_gear)} />
@@ -939,15 +923,15 @@ export default function App() {
             <Metric label={language === "zh" ? "控制器温度" : "Controller temperature"} value={status.controller_temp_c == null ? "—" : `${status.controller_temp_c} °C`} />
             <Metric label={language === "zh" ? "电机温度" : "Motor temperature"} value={status.motor_temp_c == null ? "—" : `${status.motor_temp_c} °C`} />
           </div></section>
-          {native && <>
-            <SettingsRow icon="gauge" title={t("cast")} onClick={() => native.openNative("CAST")} />
-            <SettingsRow icon="battery" title={t("deviceTools")} onClick={() => native.openNative("BMS")} />
-            <SettingsRow icon="route" title={language === "zh" ? "原生记录与轨迹" : "Native records and tracks"} onClick={() => native.openNative("RECORDS")} />
-            <SettingsRow icon="download" title={language === "zh" ? "App 更新" : "App update"} onClick={() => native.openNative("SETTINGS")} />
-          </>}
-        </>}
-        {deviceSheet === "settings" && <>
-        {native && <button type="button" onClick={() => native.openNative("SETTINGS")}>{t("deviceTools")}</button>}
+          {native && <div className="button-row">
+            <button className="btn tonal" type="button" onClick={() => native.openNative("CAST")}>{t("cast")}</button>
+            <button className="btn tonal" type="button" onClick={() => native.openNative("BMS")}>{t("deviceTools")}</button>
+            <button className="btn tonal" type="button" onClick={() => native.openNative("RECORDS")}>{language === "zh" ? "原生记录与轨迹" : "Native records and tracks"}</button>
+            <button className="btn tonal" type="button" onClick={() => native.openNative("SETTINGS")}>{language === "zh" ? "App 更新" : "App update"}</button>
+          </div>}
+        </section>
+        <section className="card stack settings-detail" aria-labelledby="settings-device-title">
+          <div className="card-head"><span className="muted"><DashboardIcon name="gear" size={20} /></span><h2 className="card-title" id="settings-device-title">{language === "zh" ? "设备设置" : "Device settings"}</h2></div>
         {manifest ? manifest.sections.filter((section) => section.id !== "update").map((section) => (
           <form className="stack" key={section.id} onSubmit={(event) => submitSection(section, event)}>
             <h2>{section.label[language]}</h2>
@@ -956,9 +940,10 @@ export default function App() {
             {section.items.some((item) => item.id === "bms_type") && <Metric label={t("bmsCapacityEstimate")} value={formatBmsCapacityEstimate(status, t)} />}
             {section.submit && <button type="submit" disabled={busy}>{t("saveDevice")}</button>}
           </form>
-        )) : <p className="empty">{message || "固件不支持动态设置，请升级"}</p>}
-        </>}
-        {deviceSheet === "update" && <>
+        )) : <p className="empty">{language === "zh" ? "连接设备后显示配置项" : "Connect to the device to view settings"}</p>}
+        </section>
+        <section className="card stack settings-detail" aria-labelledby="settings-update-title">
+          <div className="card-head"><span className="muted"><DashboardIcon name="download" size={20} /></span><h2 className="card-title" id="settings-update-title">{language === "zh" ? "更新" : "Updates"}</h2></div>
         <div className="stack">
           <h2>{t("onlineFirmware")}</h2>
           <div className="button-row">
@@ -989,7 +974,20 @@ export default function App() {
             <button type="submit" disabled={busy || transport !== "http" || !firmwareFile || !/^[0-9]{4}$/.test(firmwareCode)}>{section.items[0]?.label[language]}</button>
           </form>
         ))}
-        </>}
+        </section>
+      </section>
+
+      {tab !== "rides" && <p className="message" role="status">{busy ? <span className="loading-ring" aria-hidden="true" /> : message}</p>}
+      </div>
+
+      <nav className="tabbar" id="tabbar" aria-label="main">
+        <span className="tab-ind" aria-hidden="true" />
+        <TabButton active={tab === "overview"} label={language === "zh" ? "爱车" : "Vehicle"} icon="speed" tab="overview" onClick={() => setTab("overview")} />
+        <TabButton active={tab === "rides"} label={language === "zh" ? "功能" : "Features"} icon="route" tab="rides" onClick={() => setTab("rides")} />
+        <TabButton active={tab === "device"} label={language === "zh" ? "设置" : "Settings"} icon="gear" tab="device" onClick={() => setTab("device")} />
+      </nav>
+      <DashboardSheet open={deviceSheet !== null} title={language === "zh" ? "行驶历史" : "Ride history"} closeLabel={language === "zh" ? "关闭" : "Close"} onClose={() => setDeviceSheet(null)}>
+        <div className="device-forms">
         {deviceSheet === "history" && <>
           <RideHistory sessions={sessions} language={language} load={api} />
           <RideRecordList records={rideRecords} t={t} />
@@ -1000,14 +998,6 @@ export default function App() {
     </div>
     </div>
   );
-}
-
-function SettingsRow({ icon, title, description, onClick }: { icon: string; title: string; description?: string; onClick: () => void }) {
-  return <button type="button" className="card my-list-row" onClick={onClick}>
-    <span className="ico"><DashboardIcon name={icon} size={22} /></span>
-    <span className="my-row-text"><span className="card-title">{title}</span>{description && <span className="card-sub">{description}</span>}</span>
-    <DashboardIcon name="right" size={18} />
-  </button>;
 }
 
 function SessionList({ sessions, language, t, available }: { sessions: RideSession[]; language: Language; t: (key: keyof typeof I18N.zh) => string; available: boolean }) {
