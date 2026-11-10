@@ -12,3 +12,5 @@ React 使用原有 `.stage > .phone > .topbar / .loadbar / .scroll > .page / .ta
 
 
 首页默认 AE5 图片见 `public/art/AE5_SOURCE.md`。点击车辆图片可选择本地图片，经解码、尺寸与大小验证并缩放后保存在当前浏览器或 App 的本地存储中。
+
+`dashboard-swipe.ts` 同步来源提交 `7c413f02ac57feafd6c161192887e750d9ba97cb`（2026-11-10 23:17 +08:00）的 `ui.js bindHorizontalPages` 与 `app.js` 导航进度公式：横向拖动显示相邻页，72px 判定切页，180ms 收尾，边界阻尼且不循环；沿用输入框、横向滚动区和业务按钮的手势避让。`../styles.css` 仅补入该提交的邻页与导航跟手规则，未替换前述完整样式副本。React 适配包括监听和动画帧卸载、从已有页面创建无交互预览、同步提交选中页以及避免重复入场动画；三个底栏和设备业务均保持现状。

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { dashboardIcon, socBar, bars } from "./vendor/dashboard-parts";
 import { bindDashboardMotion, updateDashboardMotion } from "./vendor/dashboard-motion";
+import { bindDashboardPages } from "./vendor/dashboard-swipe";
 import VehicleImage from "./VehicleImage";
 import { ThemeButton } from "./DashboardTheme";
 import DashboardSheet from "./DashboardSheet";
@@ -357,6 +358,7 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => phoneRef.current ? bindDashboardMotion(phoneRef.current) : undefined, []);
+  useEffect(() => phoneRef.current ? bindDashboardPages(phoneRef.current) : undefined, []);
   const [rideRecords, setRideRecords] = useState<RideRecord[]>([]);
   const [firmwareFile, setFirmwareFile] = useState<File>();
   const [firmwareCode, setFirmwareCode] = useState("");

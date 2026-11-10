@@ -104,3 +104,13 @@ button.secondary { background: var(--md-sys-color-secondary-container) !importan
 .ride-history-plot { margin: 0; padding: 12px; border-radius: var(--shape-m); background: var(--bg-inset); }
 .ride-history-plot svg { display: block; width: 100%; height: 140px; overflow: visible; color: var(--md-sys-color-primary); }
 .ride-history-fault { font-size: 12px; line-height: 1.6; padding-block: 8px; overflow-wrap: anywhere; }
+
+/* From dashboard 7c413f0: adjacent page preview and navigation wave. */
+.main-swipe-neighbor { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.main-swipe-neighbor *, .scroll.is-swiping > .page { animation: none !important; }
+.scroll.is-swiping, .main-swipe-neighbor { will-change: transform; }
+.tabbar.is-swiping .tab {
+  color: color-mix(in srgb, var(--tab-sel-fg) calc(var(--tab-active, 0) * 100%), var(--md-sys-color-on-surface-variant));
+  transition: none;
+}
+.scroll.is-swiping { user-select: none; }

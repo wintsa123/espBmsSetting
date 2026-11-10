@@ -70,7 +70,7 @@ function animNums(state: MotionState, scope: HTMLElement, fromZero: boolean) {
 function placeTabInd(phone: HTMLElement, tab: string, animate: boolean) {
   const bar = phone.querySelector<HTMLElement>('#tabbar');
   const ind = bar?.querySelector<HTMLElement>('.tab-ind');
-  if (!bar || !ind) return;
+  if (!bar || !ind || bar.classList.contains('is-swiping')) return;
   const index = [...bar.querySelectorAll<HTMLElement>('.tab[data-tab]')].findIndex(button => button.dataset.tab === tab);
   if (index < 0) { ind.style.opacity = '0'; return; }
   if (!animate || reduced()) ind.classList.add('noanim');
@@ -152,6 +152,8 @@ export function updateDashboardMotion(phone: HTMLElement, tab: string, { busy }:
   const state = mounts.get(phone)!;
   const changed = state.tab !== tab;
   const first = state.tab === undefined;
+  const swiped = phone.dataset.swipeCommit === tab;
+  if (swiped) delete phone.dataset.swipeCommit;
   const page = phone.querySelector<HTMLElement>('#scroll > .panel.active');
   placeTabInd(phone, tab, !first);
   if (page && changed) {
@@ -159,7 +161,7 @@ export function updateDashboardMotion(phone: HTMLElement, tab: string, { busy }:
     const tabs = [...phone.querySelectorAll<HTMLElement>('#tabbar .tab[data-tab]')].map(button => button.dataset.tab);
     const forward = tabs.indexOf(tab) > tabs.indexOf(state.tab);
     page.classList.remove('page-fwd', 'page-back');
-    if (!first && !reduced()) { void page.offsetWidth; page.classList.add(forward ? 'page-fwd' : 'page-back'); }
+    if (!first && !swiped && !reduced()) { void page.offsetWidth; page.classList.add(forward ? 'page-fwd' : 'page-back'); }
     const sc = phone.querySelector<HTMLElement>('#scroll');
     if (sc) sc.scrollTop = 0;
     if (!reduced()) for (const [selector, name] of [['.hero-in', 'hero-in'], ['.bar.grow', 'grow'], ['.bars.rise', 'rise']]) {
