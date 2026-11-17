@@ -1,8 +1,9 @@
 {
-  "versionCode": 2,
-  "versionName": "0.2.0",
+  "versionCode": 4,
+  "versionName": "0.4.0",
   "url": "/apk/两轮智控.apk",
-  "size": 3655071,
-  "note": "最新版本，建议升级",
-  "publishedAt": "2026-08-27T12:00:27+08:00"
+  "size": 4243963,
+  "note": "GitHub / Cloudflare 双链路更新，独立手动检查与更新卡片交互优化",
+  "publishedAt": "2026-11-18T02:13:16+08:00",
+  "sha256": "dff592a4c56b525360fe56ea5c9672bec94067238d033cb0402d2959f10cc1cf"
 }

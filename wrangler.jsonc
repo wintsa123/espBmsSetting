@@ -2,9 +2,14 @@
   "name": "fuckbms",
   "compatibility_date": "2026-11-01",
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "html_handling": "none"
   },
   "routes": [
-    { "pattern": "fuckbms.com", "zone_name": "fuckbms.com", "custom_domain": true }
+    {
+      "pattern": "fuckbms.com",
+      "zone_name": "fuckbms.com",
+      "custom_domain": true
+    }
   ]
 }

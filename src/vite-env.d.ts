@@ -47,8 +47,10 @@ interface Window {
     getAppInfo?: () => string;
     getWebUpdateState?: () => string;
     checkWebUpdate?: () => void;
+    checkWebUpdateFrom?: (source: "cf" | "github") => void;
     restartWeb?: () => void;
     installAppUpdate?: () => void;
+    installAppUpdateFrom?: (source: "cf" | "github") => void;
     request: (id: string, method: string, path: string, body: string, host: string) => void;
     connectBle: () => void;
     bleConnected: () => boolean;

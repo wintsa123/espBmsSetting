@@ -1,5 +1,6 @@
 /*
   X-Content-Type-Options: nosniff
+  Access-Control-Allow-Origin: *
   Permissions-Policy: bluetooth=(self), local-network=(self), loopback-network=(self), local-network-access=(self)
 /
   Cache-Control: no-cache
@@ -9,6 +10,12 @@
   Cache-Control: no-cache
 /web-version.json
   Cache-Control: no-cache
+/web-update.json
+  Cache-Control: no-store
+/web/manifest-cf.json
+  Cache-Control: no-store
+/web/manifest-github.json
+  Cache-Control: no-store
 /apk/latest.json
   Cache-Control: no-store
 /firmware/firmware.json

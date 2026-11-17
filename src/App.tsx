@@ -4,7 +4,7 @@ import { dashboardIcon, socBar } from "./vendor/dashboard-parts";
 import { bindDashboardMotion, updateDashboardMotion } from "./vendor/dashboard-motion";
 import { bindDashboardPages } from "./vendor/dashboard-swipe";
 import ClientUpdateCards, { UpdateCard } from "./UpdateCards";
-import { updateUrl } from "./update-source";
+import { releaseUrl, updateUrl, type UpdateSource } from "./update-source";
 import VehicleImage from "./VehicleImage";
 import { ThemeButton } from "./DashboardTheme";
 import DashboardSheet from "./DashboardSheet";
@@ -396,6 +396,8 @@ export default function App() {
   const [firmwareCode, setFirmwareCode] = useState("");
   const [onlineFirmwares, setOnlineFirmwares] = useState<OnlineFirmware[]>([]);
   const [onlineFirmware, setOnlineFirmware] = useState<OnlineFirmware>();
+  const [firmwareSource, setFirmwareSource] = useState<UpdateSource>("cf");
+  const firmwareLoading = useRef(false);
   const [onlineLoading, setOnlineLoading] = useState(false);
   const [firmwareCheck, setFirmwareCheck] = useState<"idle" | "checked" | "error">("idle");
   const [firmwareCheckError, setFirmwareCheckError] = useState("");
@@ -843,21 +845,29 @@ export default function App() {
   };
 
   async function loadOnlineFirmwares() {
-    if (onlineLoading) return;
+    if (firmwareLoading.current) return;
+    firmwareLoading.current = true;
     setOnlineLoading(true);
     setFirmwareCheckError("");
+    setOnlineFirmwares([]);
+    setOnlineFirmware(undefined);
+    setFirmwareFile(undefined); setFirmwareCode("");
     try {
-      const response = await fetch(updateUrl("firmware/firmware.json"), { cache: "no-store", signal: AbortSignal.timeout(15000) });
+      const response = await fetch(updateUrl("firmware/firmware.json", firmwareSource), { cache: "no-store", signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = (await response.json()) as { firmwares?: OnlineFirmware[] };
       if (!Array.isArray(data.firmwares)) throw new Error(language === "zh" ? "无效的固件更新清单" : "Invalid firmware manifest");
       setFirmwareCheck("checked");
-      setOnlineFirmwares(Array.isArray(data.firmwares) ? data.firmwares.map((item) => ({ ...item, url: new URL(item.url, response.url).href })) : []);
+      setOnlineFirmwares(data.firmwares.map(item => {
+        if (!item || typeof item.profile !== "string" || !item.profile || typeof item.url !== "string" || !item.url) throw new Error(language === "zh" ? "无效的固件条目" : "Invalid firmware release");
+        return { ...item, url: releaseUrl(item.url, response.url) };
+      }));
       if (!Array.isArray(data.firmwares) || data.firmwares.length === 0) setMessage(t("noOnlineFirmware"));
     } catch (error) {
       setFirmwareCheck("error");
       setFirmwareCheckError(error instanceof Error ? error.message : String(error));
     } finally {
+      firmwareLoading.current = false;
       setOnlineLoading(false);
     }
   }
@@ -868,12 +878,13 @@ export default function App() {
     setBusy(true);
     try {
       setMessage(t("firmwareDownloading"));
-      const response = await fetch(selected.url, { cache: "no-store" });
+      const response = await fetch(selected.url, { cache: "no-store", signal: AbortSignal.timeout(60000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
       setFirmwareFile(new File([blob], `${selected.profile}.bin`, { type: "application/octet-stream" }));
       setFirmwareCode(selected.code || "");
       setOnlineFirmware(selected);
+      setMessage(language === "zh" ? "固件已下载，请连接面板并确认验证码后刷写" : "Firmware downloaded. Connect the panel and confirm the code before flashing.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -972,7 +983,7 @@ export default function App() {
         <section className="card stack settings-detail update-card" aria-labelledby="settings-update-title">
           <div className="card-head"><span className="muted"><DashboardIcon name="download" size={20} /></span><h2 className="card-title" id="settings-update-title">{language === "zh" ? "更新" : "Updates"}</h2></div>
         <ClientUpdateCards language={language} appInfo={appInfo} />
-        <UpdateCard language={language} title={language === "zh" ? "固件更新" : "Firmware update"} version={`${language === "zh" ? "当前面板" : "Current panel"} ${status.version || "—"}`} checking={onlineLoading} onCheck={() => void loadOnlineFirmwares()} status={onlineLoading ? (language === "zh" ? "正在检查…" : "Checking…") : firmwareCheck === "error" ? (language === "zh" ? "检查失败，点击重试" : "Failed; tap to retry") : firmwareCheck === "checked" ? (language === "zh" ? `找到 ${onlineFirmwares.length} 款固件` : `${onlineFirmwares.length} releases found`) : (language === "zh" ? "查找更新" : "Check for updates")}>
+        <UpdateCard badge="OTA" source={firmwareSource} onSourceChange={value => { setFirmwareSource(value); setOnlineFirmwares([]); setOnlineFirmware(undefined); setFirmwareFile(undefined); setFirmwareCode(""); setFirmwareCheck("idle"); setFirmwareCheckError(""); }} language={language} title={language === "zh" ? "固件更新" : "Firmware update"} version={`${language === "zh" ? "当前面板" : "Current panel"} ${status.version || "—"}`} checking={onlineLoading || busy} onCheck={() => void loadOnlineFirmwares()} status={onlineLoading ? (language === "zh" ? "正在检查…" : "Checking…") : firmwareCheck === "error" ? (language === "zh" ? "检查失败，请重试或切换链路" : "Failed; retry or switch source") : firmwareCheck === "checked" ? (language === "zh" ? `找到 ${onlineFirmwares.length} 款固件` : `${onlineFirmwares.length} releases found`) : (language === "zh" ? "尚未检查" : "Not checked")}>
         {firmwareCheckError && <p className="empty" role="status">{firmwareCheckError}</p>}
         <div className="stack">
           <h2>{t("onlineFirmware")}</h2>
@@ -980,7 +991,7 @@ export default function App() {
             <select
               value={onlineFirmware?.profile || ""}
               disabled={busy || onlineFirmwares.length === 0}
-              onChange={(event) => void pickOnlineFirmware(event.target.value)}
+              onChange={(event) => { setOnlineFirmware(onlineFirmwares.find(item => item.profile === event.target.value)); setFirmwareFile(undefined); setFirmwareCode(""); }}
             >
               <option value="">{onlineFirmwares.length === 0 ? t("noOnlineFirmware") : "—"}</option>
               {onlineFirmwares.map((item) => (
@@ -990,13 +1001,16 @@ export default function App() {
               ))}
             </select>
           </div>
+          <button className="btn tonal" type="button" disabled={busy || !onlineFirmware} onClick={() => onlineFirmware && void pickOnlineFirmware(onlineFirmware.profile)}>{language === "zh" ? "下载所选固件" : "Download selected firmware"}</button>
+          {firmwareFile && <p className="card-sub">{language === "zh" ? "已准备" : "Ready"} · {firmwareFile.name} · {(firmwareFile.size / 1024).toFixed(0)} KB</p>}
           <p className="card-sub">{language === "zh" ? "选择匹配硬件的固件后下载；刷写前仍需确认文件和验证码。" : "Download firmware matching your hardware, then confirm the file and verification code before flashing."}</p>
         </div>
         {manifest?.sections.filter((section) => section.id === "update").map((section) => (
           <form className="stack" key={section.id} onSubmit={submitFirmware}>
             <h2>{section.label[language]}</h2>
             <ManifestControl item={section.items[0]} language={language} busy={busy} value="" candidates={[]} onValue={() => {}} onAction={() => {}} onLoadChoices={() => {}} onSubmitChoice={() => {}} />
-            <label><span>{t("firmwareFile")}</span><input type="file" accept={section.items[0]?.accept} required onChange={(event) => { setFirmwareFile(event.target.files?.[0]); setFirmwareCode(""); }} /></label>
+            <label><span>{t("firmwareFile")}</span><input type="file" accept={section.items[0]?.accept} required={!firmwareFile} onChange={(event) => { setFirmwareFile(event.target.files?.[0]); setFirmwareCode(""); }} /></label>
+            {firmwareFile && <p className="card-sub">{firmwareFile.name} · {(firmwareFile.size / 1024).toFixed(0)} KB</p>}
             <label><span>{t("firmwareCode")}</span><input value={firmwareCode} inputMode="numeric" minLength={4} maxLength={4} required onChange={(event) => setFirmwareCode(event.target.value.replace(/\D/g, "").slice(0, 4))} /></label>
             <button type="submit" disabled={busy || transport !== "http" || !firmwareFile || !/^[0-9]{4}$/.test(firmwareCode)}>{section.items[0]?.label[language]}</button>
           </form>

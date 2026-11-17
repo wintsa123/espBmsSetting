@@ -120,12 +120,22 @@ button.secondary { background: var(--md-sys-color-secondary-container) !importan
 .tabbar .tab { transition-property: background, color, gap, min-height; }
 .tabbar.is-compact .tab { min-height: 44px; }
 
-.update-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; font-size: 14px; }
-.update-row + .update-row { border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 14px; }
+.update-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 94px; padding: 16px 8px; border: 0; border-radius: 16px; color: var(--md-sys-color-on-surface); background: transparent; text-align: start; cursor: pointer; }
+.update-row:hover { background: var(--md-sys-color-surface-container-high); }
+.update-badge { display: grid; place-items: center; flex: 0 0 44px; height: 44px; border-radius: 14px; background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); font-size: 11px; font-weight: 750; letter-spacing: .5px; }
+.update-summary { display: grid; gap: 5px; flex: 1; min-width: 0; }
+.update-summary strong { font-size: 15px; }
+.update-summary > span { font-size: 12px; overflow-wrap: anywhere; color: var(--md-sys-color-on-surface-variant); }
+.update-summary-status { display: flex; gap: 6px; align-items: center; }
+.update-arrow { color: var(--md-sys-color-on-surface-variant); font-size: 26px; }
+.update-sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.update-check-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.update-release { padding: 14px; border-radius: 14px; background: var(--md-sys-color-surface-container-high); overflow-wrap: anywhere; }
+.update-release p { margin-bottom: 0; }
 .update-card-check { flex-shrink: 0; min-height: 36px; padding: 8px 14px; font-size: 12px; }
 .update-card-status { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--md-sys-color-primary); font-size: 14px; }
 .update-details .card-sub, .update-details .empty { overflow-wrap: anywhere; }
-.update-card-check:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: 3px; }
+.update-row:focus-visible, .update-card-check:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: 3px; }
 
 .companion-card { margin-bottom: 18px; background: linear-gradient(135deg, rgba(0,181,204,.10), transparent 80%), var(--card-bg, var(--surface)); }
 .companion-symbol { font-size: 30px; line-height: 1; color: var(--accent, #00b5cc); }
