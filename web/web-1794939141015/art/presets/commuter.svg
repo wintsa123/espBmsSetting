@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480" role="img" aria-labelledby="title desc"><title id="title">轻便电摩 / Light electric moped</title><desc id="desc">原创轻便电动摩托车插图，细车架、外露电池与长坐垫。</desc><defs><linearGradient id="commuter-paint" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#8fb8b2"/><stop offset=".5" stop-color="#527b82"/><stop offset="1" stop-color="#527b82"/></linearGradient><linearGradient id="commuter-rim" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e4edf0"/><stop offset="1" stop-color="#71828e"/></linearGradient><linearGradient id="commuter-seat" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#3c4954"/><stop offset="1" stop-color="#18232c"/></linearGradient><linearGradient id="commuter-metal" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#596b78"/><stop offset=".45" stop-color="#c5d4dc"/><stop offset="1" stop-color="#697e8b"/></linearGradient></defs><ellipse cx="399" cy="416" rx="304" ry="13" fill="#152737" opacity=".12"/><g transform="translate(187 350)"><circle r="62" fill="#19232c"/><circle r="55" fill="#28333d"/><circle r="49" fill="#111b24"/><circle r="43" fill="url(#commuter-rim)"/><g stroke="#657581" stroke-width="7" stroke-linecap="round"><path d="M0 -35V35M-31 -18L31 18M-31 18L31 -18"/></g><circle r="16" fill="#293b47"/><circle r="7" fill="#dce6eb"/><path d="M-36 -38A53 53 0 0 1 35 -39" fill="none" stroke="#69747d" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"/></g><g transform="translate(614 350)"><circle r="62" fill="#19232c"/><circle r="55" fill="#28333d"/><circle r="49" fill="#111b24"/><circle r="43" fill="url(#commuter-rim)"/><g stroke="#657581" stroke-width="7" stroke-linecap="round"><path d="M0 -35V35M-31 -18L31 18M-31 18L31 -18"/></g><circle r="16" fill="#293b47"/><circle r="7" fill="#dce6eb"/><path d="M-36 -38A53 53 0 0 1 35 -39" fill="none" stroke="#69747d" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"/></g>
+<path d="M184 350L301 283L407 333L605 349" fill="none" stroke="#344953" stroke-width="17" stroke-linejoin="round"/>
+<path d="M298 278L409 333L479 219L521 216" fill="none" stroke="#498d89" stroke-width="15" stroke-linejoin="round"/>
+<path d="M305 278L328 325L408 332" fill="none" stroke="#719b99" stroke-width="8"/>
+<path d="M220 255L237 330" stroke="url(#commuter-metal)" stroke-width="11"/><path d="M222 263L234 317" stroke="#67b0a0" stroke-width="17" stroke-dasharray="3 5"/>
+<path d="M149 279Q189 253 249 263L298 280L282 305L208 298L151 304Z" fill="url(#commuter-paint)" stroke="#345963" stroke-width="3"/>
+<path d="M166 278L247 278" stroke="#8abdb6" stroke-width="4" stroke-linecap="round"/>
+<path d="M288 282L324 301L340 268L312 247Z" fill="#4f7d7a"/>
+<path d="M338 263L407 263L438 306L419 333L347 326L325 304Z" fill="#263e49" stroke="#1a2e39" stroke-width="3"/>
+<path d="M353 275H400L417 299L402 314H355Z" fill="#496571"/><path d="M370 282L359 298H373L365 309L390 291H378L384 282Z" fill="#a9dcbb"/>
+<path d="M337 330H425" stroke="#202f38" stroke-width="11" stroke-linecap="round"/>
+<path d="M157 242L175 227H303L324 240L312 256H170Z" fill="url(#commuter-seat)" stroke="#243541" stroke-width="3"/>
+<path d="M178 237H300" stroke="#6c818a" stroke-width="2"/>
+<path d="M146 236H118L105 250H138" fill="none" stroke="#59717c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M502 219L537 283L614 350" fill="none" stroke="url(#commuter-metal)" stroke-width="12"/>
+<path d="M548 283L603 333" stroke="#2d4654" stroke-width="17"/>
+<path d="M513 238L540 261L565 274L554 227L533 198L506 199Z" fill="url(#commuter-paint)" stroke="#345963" stroke-width="3"/>
+<path d="M521 205L507 166L483 152L453 152" fill="none" stroke="#344d59" stroke-width="11" stroke-linecap="round"/>
+<path d="M484 152L472 118" stroke="#82979f" stroke-width="4"/><rect x="450" y="102" width="32" height="16" rx="7" fill="#2c4956"/>
+<path d="M520 181L545 182L551 205L528 209Z" fill="#d8f5ed" stroke="#799d9d" stroke-width="3"/>
+<path d="M571 312Q614 280 654 315" fill="none" stroke="#466d73" stroke-width="9" stroke-linecap="round"/>
+<path d="M147 277L161 274L159 289L146 292Z" fill="#eb7264"/>
+<path d="M440 334L418 380" stroke="#344955" stroke-width="7" stroke-linecap="round"/>
+</svg>

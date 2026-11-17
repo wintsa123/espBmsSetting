@@ -1,0 +1,15 @@
+{
+  "updatedAt": "2026-08-27T12:00:27+08:00",
+  "firmwares": [
+    {
+      "profile": "esp32",
+      "name": "ESP32 精简版",
+      "chip": "esp32",
+      "version": "dev2",
+      "url": "/firmware/esp32.bin",
+      "size": 1821392,
+      "code": "1397",
+      "note": "仪表：controller、fireblade、s1000rr"
+    }
+  ]
+}
