@@ -7,13 +7,15 @@ type DashboardSheetProps = {
   title: string;
   subtitle?: string;
   closeLabel?: string;
+  page?: boolean;
+  center?: boolean;
   onClose: () => void;
   children: ReactNode;
 };
 
 const focusableSelector = 'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
-export default function DashboardSheet({ open, title, subtitle, closeLabel = "关闭", onClose, children }: DashboardSheetProps) {
+export default function DashboardSheet({ open, title, subtitle, closeLabel = "关闭", page = false, center = false, onClose, children }: DashboardSheetProps) {
   const [present, setPresent] = useState(open);
   const [visible, setVisible] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -22,6 +24,10 @@ export default function DashboardSheet({ open, title, subtitle, closeLabel = "�
   const openRef = useRef(open);
   closeRef.current = onClose;
   openRef.current = open;
+  // 父组件关闭时会清空内容和居中状态，退出动画结束前保留最后打开的外观。
+  const contentRef = useRef({ title, subtitle, page, center, children });
+  if (open) contentRef.current = { title, subtitle, page, center, children };
+  const content = contentRef.current;
   const titleId = useId();
   const subtitleId = useId();
   const [host, setHost] = useState<HTMLElement | null>(null);
@@ -99,16 +105,16 @@ export default function DashboardSheet({ open, title, subtitle, closeLabel = "�
 
   if (!present || !host) return null;
   return createPortal(<>
-    <div ref={scrimRef} className={`scrim dashboard-sheet-scrim${visible ? " show" : ""}`} aria-hidden="true" onClick={() => closeRef.current()} />
-    <div ref={sheetRef} className={`sheet half dashboard-sheet${visible ? " show" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={subtitle ? subtitleId : undefined} tabIndex={-1} onTransitionEnd={event => {
+    <div ref={scrimRef} className={`scrim dashboard-sheet-scrim${content.page ? " route-page" : ""}${visible ? " show" : ""}`} aria-hidden="true" onClick={() => closeRef.current()} />
+    <div ref={sheetRef} inert={!open} className={`sheet ${content.page ? "full route-page" : content.center ? "center" : "half"} dashboard-sheet${visible ? " show" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={content.subtitle ? subtitleId : undefined} tabIndex={-1} onTransitionEnd={event => {
       if (event.target === event.currentTarget && event.propertyName === "transform" && !openRef.current) setPresent(false);
     }}>
       <div className="grab" aria-hidden="true" />
       <div className="sheet-head">
-        <div className="dashboard-sheet-heading"><div className="sheet-title" id={titleId}>{title}</div>{subtitle && <div className="sheet-sub" id={subtitleId}>{subtitle}</div>}</div>
-        <button className="iconbtn" type="button" aria-label={closeLabel} onClick={() => closeRef.current()}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+        {content.page && <button className="iconbtn" data-back type="button" aria-label={closeLabel} onClick={() => closeRef.current()}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m14.5 6.5-5.5 5.5 5.5 5.5" /></svg></button>}
+        <div className="dashboard-sheet-heading"><div className="sheet-title" id={titleId}>{content.title}</div>{content.subtitle && <div className="sheet-sub" id={subtitleId}>{content.subtitle}</div>}</div>
       </div>
-      <div className="sheet-body">{children}</div>
+      <div className="sheet-body">{content.children}</div>
     </div>
   </>, host);
 }

@@ -3,3 +3,6 @@
 .dashboard-sheet .sheet-head > .iconbtn { flex: none; }
 .dashboard-sheet .sheet-body { overscroll-behavior: contain; }
 .dashboard-sheet:focus { outline: none; }
+.sheet.dashboard-sheet.route-page { top: var(--sat, 0px); height: auto; padding: 10px 0 0; }
+.dashboard-sheet.route-page .sheet-body { scrollbar-width: none; }
+.dashboard-sheet.route-page .sheet-body::-webkit-scrollbar { display: none; }

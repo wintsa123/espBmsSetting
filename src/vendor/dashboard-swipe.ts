@@ -47,7 +47,7 @@ export function bindHorizontalPages(root: HTMLElement, { current, items, enabled
     };
     const begin = (event: Event, points: ArrayLike<{ clientX: number; clientY: number }>) => {
       reset(); suppressClick = false;
-      if (!enabled() || points.length !== 1 || (event.target as Element).closest('input, textarea, select, a, [contenteditable], canvas, .leaflet-container, .action, .cap-wrap')) return;
+      if (!enabled() || points.length !== 1 || (event.target as Element).closest('input, textarea, select, a, [contenteditable], canvas, [data-no-swipe], .home-dashboard.editing, .leaflet-container, .action, .cap-wrap')) return;
       for (let node = event.target as HTMLElement | null; node && node !== root; node = node.parentElement) {
         if (node.scrollWidth > node.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(node).overflowX)) return;
       }
@@ -136,7 +136,7 @@ export function bindDashboardPages(phone: HTMLElement): () => void {
   const current = () => bar.querySelector<HTMLElement>('.tab.sel')?.dataset.tab || items[0];
   return bindHorizontalPages(root, {
     current, items,
-    enabled: () => !root.inert && !phone.querySelector('.scrim.show, .sheet.show, [aria-modal="true"]'),
+    enabled: () => !root.inert && !phone.querySelector('[data-home-editing="true"]') && !phone.querySelector('.scrim.show, .sheet.show, [aria-modal="true"]'),
     select: tab => {
       phone.dataset.swipeCommit = tab;
       flushSync(() => buttons[items.indexOf(tab)]?.click());

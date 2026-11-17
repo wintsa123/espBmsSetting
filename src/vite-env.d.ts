@@ -22,6 +22,8 @@ type BluetoothDevice = EventTarget & {
   name?: string;
   gatt?: {
     connect: () => Promise<BluetoothRemoteGATTServer>;
+    disconnect: () => void;
+    connected: boolean;
   };
 };
 
@@ -51,6 +53,7 @@ interface Window {
     connectBle: () => void;
     bleConnected: () => boolean;
     openNative: (route: string) => void;
+    openCompanion?: (page: string, language: string) => void;
   };
   __bmsNativeReply?: (id: string, payload: string) => void;
   bmsNativeRequest?: (method: string, path: string, body: string, host: string) => Promise<unknown>;

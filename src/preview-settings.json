@@ -1,0 +1,312 @@
+[
+  {
+    "id": "brightness",
+    "kind": "range",
+    "label": {
+      "zh": "亮度",
+      "en": "Brightness"
+    },
+    "value": 80,
+    "min": 10,
+    "max": 100,
+    "step": 1
+  },
+  {
+    "id": "volume",
+    "kind": "range",
+    "label": {
+      "zh": "音量",
+      "en": "Volume"
+    },
+    "value": 60,
+    "min": 0,
+    "max": 100,
+    "step": 1
+  },
+  {
+    "id": "display_rotation",
+    "kind": "select",
+    "label": {
+      "zh": "屏幕方向",
+      "en": "Screen rotation"
+    },
+    "value": "portrait",
+    "options": [
+      {
+        "value": "portrait",
+        "label": {
+          "zh": "竖屏",
+          "en": "Portrait"
+        }
+      },
+      {
+        "value": "landscape",
+        "label": {
+          "zh": "横屏",
+          "en": "Landscape"
+        }
+      },
+      {
+        "value": "inverted_portrait",
+        "label": {
+          "zh": "反向竖屏",
+          "en": "Inverted portrait"
+        }
+      },
+      {
+        "value": "inverted_landscape",
+        "label": {
+          "zh": "反向横屏",
+          "en": "Inverted landscape"
+        }
+      }
+    ]
+  },
+  {
+    "id": "speed_unit",
+    "kind": "select",
+    "label": {
+      "zh": "速度单位",
+      "en": "Speed unit"
+    },
+    "value": "km/h",
+    "options": [
+      {
+        "value": "km/h",
+        "label": {
+          "zh": "公里/小时",
+          "en": "km/h"
+        }
+      },
+      {
+        "value": "mph",
+        "label": {
+          "zh": "英里/小时",
+          "en": "mph"
+        }
+      }
+    ]
+  },
+  {
+    "id": "speed_source",
+    "kind": "select",
+    "label": {
+      "zh": "速度来源",
+      "en": "Speed source"
+    },
+    "value": "gps",
+    "options": [
+      {
+        "value": "gps",
+        "label": {
+          "zh": "GPS",
+          "en": "GPS"
+        }
+      },
+      {
+        "value": "controller",
+        "label": {
+          "zh": "控制器",
+          "en": "Controller"
+        }
+      }
+    ]
+  },
+  {
+    "id": "bms_type",
+    "kind": "select",
+    "label": {
+      "zh": "保护板类型",
+      "en": "BMS type"
+    },
+    "value": "ant",
+    "options": [
+      {
+        "value": "ant",
+        "label": {
+          "zh": "蚂蚁 ANT",
+          "en": "ANT"
+        }
+      },
+      {
+        "value": "jk",
+        "label": {
+          "zh": "极空 JK",
+          "en": "JK"
+        }
+      },
+      {
+        "value": "jbd",
+        "label": {
+          "zh": "嘉佰达 JBD",
+          "en": "JBD"
+        }
+      },
+      {
+        "value": "daly",
+        "label": {
+          "zh": "达锂 Daly",
+          "en": "Daly"
+        }
+      },
+      {
+        "value": "yanyang",
+        "label": {
+          "zh": "彦阳 BMS",
+          "en": "Yanyang BMS"
+        }
+      },
+      {
+        "value": "bluebabe",
+        "label": {
+          "zh": "蓝宝电量模块",
+          "en": "Bluebabe meter"
+        }
+      },
+      {
+        "value": "mingtang",
+        "label": {
+          "zh": "明唐保护板",
+          "en": "Mingtang BMS"
+        }
+      },
+      {
+        "value": "em02",
+        "label": {
+          "zh": "鹿行 EM02",
+          "en": "Luxing EM02"
+        }
+      }
+    ]
+  },
+  {
+    "id": "controller_type",
+    "kind": "select",
+    "label": {
+      "zh": "控制器型号",
+      "en": "Controller model"
+    },
+    "value": "auto",
+    "options": [
+      {
+        "value": "auto",
+        "label": {
+          "zh": "自动识别",
+          "en": "Auto detect"
+        }
+      },
+      {
+        "value": "bluestone",
+        "label": {
+          "zh": "蓝石 BlueStone",
+          "en": "BlueStone"
+        }
+      },
+      {
+        "value": "fardriver",
+        "label": {
+          "zh": "远驱 FarDriver",
+          "en": "FarDriver"
+        }
+      },
+      {
+        "value": "yuanqu_foc",
+        "label": {
+          "zh": "远驱 YuanQu FOC",
+          "en": "YuanQu FOC"
+        }
+      },
+      {
+        "value": "lingbo",
+        "label": {
+          "zh": "凌博 Lingbo",
+          "en": "Lingbo"
+        }
+      },
+      {
+        "value": "datai",
+        "label": {
+          "zh": "大泰 Datai",
+          "en": "Datai"
+        }
+      },
+      {
+        "value": "suniu",
+        "label": {
+          "zh": "速牛 Suniu",
+          "en": "Suniu"
+        }
+      },
+      {
+        "value": "yanxin",
+        "label": {
+          "zh": "雁鑫 Yanxin VITMC",
+          "en": "Yanxin VITMC"
+        }
+      },
+      {
+        "value": "apt_a8",
+        "label": {
+          "zh": "APT A8",
+          "en": "APT A8"
+        }
+      },
+      {
+        "value": "apt_legacy",
+        "label": {
+          "zh": "APT 安培旧版",
+          "en": "APT Anpei"
+        }
+      },
+      {
+        "value": "dunen",
+        "label": {
+          "zh": "顿恩 DN",
+          "en": "DN Dunen"
+        }
+      },
+      {
+        "value": "zhike",
+        "label": {
+          "zh": "智科 Zhike",
+          "en": "GEKOO Zhike"
+        }
+      },
+      {
+        "value": "jh",
+        "label": {
+          "zh": "晶汇 JH",
+          "en": "JH"
+        }
+      },
+      {
+        "value": "ausi",
+        "label": {
+          "zh": "AUSI 玉铖",
+          "en": "AUSI"
+        }
+      },
+      {
+        "value": "jiazhou",
+        "label": {
+          "zh": "甲胄动力 DS11/DS15",
+          "en": "Jiazhou DS11/DS15"
+        }
+      },
+      {
+        "value": "xinda",
+        "label": {
+          "zh": "昕达动能",
+          "en": "Xinda"
+        }
+      },
+      {
+        "value": "hobbywing",
+        "label": {
+          "zh": "好盈 SPD",
+          "en": "Hobbywing SPD"
+        }
+      }
+    ]
+  }
+]

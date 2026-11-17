@@ -98,9 +98,10 @@ export default function VehicleImageEditor({ open, initialSrc, language, onSave,
   };
   const rect = image ? cropGeometry(image.naturalWidth, image.naturalHeight, crop) : null;
 
-  return <DashboardSheet open={open} title={zh ? "车辆图片" : "Vehicle image"} closeLabel={zh ? "取消" : "Cancel"} onClose={onClose}>
+  return <DashboardSheet page open={open} title={zh ? "车辆图片" : "Vehicle image"} closeLabel={zh ? "返回" : "Back"} onClose={onClose}>
     <div className="vehicle-image-editor">
-      <p className="card-sub">{zh ? "选图后拖拽调整位置，缩放裁剪，确定后保存。" : "Choose an image, drag to position, and zoom to crop. Confirm to save."}</p>
+      <p className="card-sub">{zh ? "使用本地图片或下方预置图片，拖拽、缩放裁剪，确定后保存在本机。" : "Use a local image or a preset below. Drag and zoom to crop, then confirm to save on this device."}</p>
+      <div className="vehicle-editor-actions"><button className="btn" type="button" disabled={loading} onClick={() => input.current?.click()}>{zh ? "使用本地图片" : "Use local image"}</button><button className="btn text" type="button" disabled={loading} onClick={() => void selectSource(DEFAULT_IMAGE)}>{zh ? "恢复默认" : "Restore default"}</button></div>
       <div className="vehicle-crop-stage" role="group" aria-label={zh ? "拖拽裁剪车辆图片，方向键可微调" : "Drag to crop vehicle image; arrow keys adjust position"} tabIndex={0} aria-busy={loading} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={() => { drag.current = undefined; }} onPointerCancel={() => { drag.current = undefined; }} onLostPointerCapture={() => { drag.current = undefined; }} onKeyDown={event => {
         const offsets: Record<string, [number, number]> = { ArrowLeft: [-.02, 0], ArrowRight: [.02, 0], ArrowUp: [0, -.02], ArrowDown: [0, .02] };
         if (offsets[event.key]) { event.preventDefault(); const [x, y] = offsets[event.key]; move({ ...crop, x: crop.x + x, y: crop.y + y }); }
@@ -110,7 +111,6 @@ export default function VehicleImageEditor({ open, initialSrc, language, onSave,
         {loading && <span className="vehicle-crop-loading">{zh ? "正在读取图片…" : "Loading image…"}</span>}
       </div>
       <label className="vehicle-zoom"><span>{zh ? "缩放" : "Zoom"}<b className="tnum">{Math.round(crop.zoom * 100)}%</b></span><input type="range" min="1" max="4" step="0.01" value={crop.zoom} aria-label={zh ? "缩放" : "Zoom"} disabled={!image || loading} onChange={event => move({ ...crop, zoom: Number(event.target.value) })} /></label>
-      <div className="vehicle-editor-actions"><button className="btn tonal" type="button" disabled={loading} onClick={() => input.current?.click()}>{zh ? "选图" : "Choose image"}</button><button className="btn text" type="button" disabled={loading} onClick={() => void selectSource(DEFAULT_IMAGE)}>{zh ? "恢复默认" : "Restore default"}</button></div>
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" aria-label={zh ? "上传车辆图片" : "Upload vehicle image"} hidden onChange={event => void upload(event)} />
       <h2>{zh ? "预置图片" : "Preset images"}</h2>
       <div className="vehicle-presets">{PRESETS.map(preset => <button className={`vehicle-preset${source === preset.src ? " sel" : ""}`} type="button" key={preset.src} disabled={loading} aria-label={`${zh ? "预置车辆：" : "Preset vehicle: "}${zh ? preset.zh : preset.en}`} aria-pressed={source === preset.src} onClick={() => void selectSource(preset.src)}><img src={preset.src} alt="" /><span>{zh ? preset.zh : preset.en}</span></button>)}</div>

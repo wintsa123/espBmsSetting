@@ -1,7 +1,3 @@
-/* A full page inside the existing phone shell, using the original page/sheet transition. */
-.sheet.dashboard-sheet:has(.vehicle-image-editor) { top: var(--sat, 0px); bottom: 0; max-height: none; border-radius: 0; padding-top: 10px; height: auto; }
-.sheet.dashboard-sheet:has(.vehicle-image-editor) > .grab { display: none; }
-.sheet.dashboard-sheet:has(.vehicle-image-editor) .sheet-body { display: block; flex: 1; padding-bottom: calc(16px + var(--sab, 0px)); }
 .vehicle-image-editor { display: grid; gap: 16px; }
 .vehicle-image-editor > p { margin: 0; }
 .vehicle-image-editor h2 { font-size: 14px; }

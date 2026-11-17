@@ -7,8 +7,10 @@
     "build": "vite build",
     "dev": "vite --host 0.0.0.0",
     "preview": "vite preview --host 0.0.0.0",
-    "preview:fnconnect": "npm run build && vite preview --host 0.0.0.0 --port 8787 --strictPort",
-    "typecheck": "tsc --noEmit"
+    "preview:fnconnect": "npm run build:preview && vite preview --mode preview --host 0.0.0.0 --port 8787 --strictPort",
+    "preview:lan": "npm run build && vite preview --host 0.0.0.0 --port 8787 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "build:preview": "vite build --mode preview"
   },
   "dependencies": {
     "react": "^19.0.0",

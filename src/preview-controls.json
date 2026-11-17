@@ -1,0 +1,156 @@
+[
+  {
+    "id": "hotspot",
+    "zh": "热点共享",
+    "en": "Hotspot share",
+    "controls": [
+      {
+        "id": "wifi",
+        "zh": "开关设备热点",
+        "en": "Toggle hotspot",
+        "confirm": true
+      }
+    ]
+  },
+  {
+    "id": "bluetooth",
+    "zh": "蓝牙",
+    "en": "Bluetooth",
+    "controls": [
+      {
+        "id": "bluetooth",
+        "zh": "开启蓝牙广播",
+        "en": "Enable Bluetooth advertising",
+        "confirm": false
+      }
+    ]
+  },
+  {
+    "id": "bms",
+    "zh": "BMS 设置",
+    "en": "BMS settings",
+    "controls": [
+      {
+        "id": "bms_disconnect",
+        "zh": "断开保护板",
+        "en": "Disconnect BMS",
+        "confirm": true
+      }
+    ]
+  },
+  {
+    "id": "gps",
+    "zh": "GPS",
+    "en": "GPS",
+    "controls": []
+  },
+  {
+    "id": "dashboard",
+    "zh": "仪表",
+    "en": "Dashboard",
+    "controls": [
+      {
+        "id": "dashboard_style",
+        "zh": "仪表样式",
+        "en": "Dashboard style",
+        "confirm": false,
+        "value": 0,
+        "min": 0,
+        "max": 2,
+        "step": 1
+      },
+      {
+        "id": "range",
+        "zh": "满电预估续航 (km)",
+        "en": "Full-charge range (km)",
+        "confirm": false,
+        "value": 100,
+        "min": 0,
+        "max": 9999,
+        "step": 1
+      }
+    ]
+  },
+  {
+    "id": "controller",
+    "zh": "控制器",
+    "en": "Controller",
+    "controls": [
+      {
+        "id": "tire_rim",
+        "zh": "轮毂直径 (英寸)",
+        "en": "Rim diameter (inch)",
+        "confirm": false,
+        "value": 12,
+        "min": 8,
+        "max": 24,
+        "step": 1
+      },
+      {
+        "id": "tire_width",
+        "zh": "轮胎宽度 (mm)",
+        "en": "Tire width (mm)",
+        "confirm": false,
+        "value": 90,
+        "min": 50,
+        "max": 200,
+        "step": 5
+      },
+      {
+        "id": "tire_aspect",
+        "zh": "轮胎扁平比 (%)",
+        "en": "Tire aspect (%)",
+        "confirm": false,
+        "value": 80,
+        "min": 30,
+        "max": 100,
+        "step": 5
+      },
+      {
+        "id": "ratio",
+        "zh": "传动比 × 100",
+        "en": "Gear ratio × 100",
+        "confirm": false,
+        "value": 100,
+        "min": 50,
+        "max": 1000,
+        "step": 1
+      }
+    ]
+  },
+  {
+    "id": "system",
+    "zh": "系统",
+    "en": "System",
+    "controls": [
+      {
+        "id": "boot_style",
+        "zh": "开机动画",
+        "en": "Boot animation",
+        "confirm": false,
+        "value": 0,
+        "min": 0,
+        "max": 2,
+        "step": 1
+      },
+      {
+        "id": "level_position",
+        "zh": "切换调节条位置",
+        "en": "Cycle slider position",
+        "confirm": false
+      },
+      {
+        "id": "calibrate",
+        "zh": "开始触屏校准（在设备上点选）",
+        "en": "Start calibration (tap device targets)",
+        "confirm": false
+      },
+      {
+        "id": "restore",
+        "zh": "恢复默认设置",
+        "en": "Restore defaults",
+        "confirm": true
+      }
+    ]
+  }
+]

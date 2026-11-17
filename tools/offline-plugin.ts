@@ -8,21 +8,21 @@ function files(root: string): string[] {
 }
 
 // Content versions remain stable across repeated builds and change with UI or bundled artwork.
-export function webVersion() {
+export function webVersion(mapKey = "") {
   const hash = createHash("sha256");
   hash.update(process.env.VITE_UPDATE_BASE_URL || "");
+  hash.update(mapKey);
   for (const path of [...files("src"), ...files("public").filter(path => !/^public\/(apk|firmware)\//.test(path) && !path.endsWith("dashboard-update.json")), ...files("tools"), "index.html", "vite.config.ts", "package.json", "package-lock.json"]) {
     hash.update(path); hash.update(readFileSync(path));
   }
   return hash.digest("hex").slice(0, 16);
 }
 
-export function offlinePlugin(version: string): Plugin {
+export function offlinePlugin(version: string, root = "dist"): Plugin {
   return {
     name: "dashboard-offline",
     apply: "build",
     closeBundle() {
-      const root = "dist";
       writeFileSync(join(root, "web-version.json"), JSON.stringify({ version }));
       const entries = files(root).map(path => relative(root, path).replaceAll("\\", "/"))
         .filter(path => !/^(apk\/|firmware\/|sw\.js$|_headers$|_redirects$|dashboard-update\.json$)/.test(path))
