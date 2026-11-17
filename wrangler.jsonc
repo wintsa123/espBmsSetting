@@ -1,0 +1,10 @@
+{
+  "name": "fuckbms",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist"
+  },
+  "routes": [
+    { "pattern": "fuckbms.com", "zone_name": "fuckbms.com", "custom_domain": true }
+  ]
+}

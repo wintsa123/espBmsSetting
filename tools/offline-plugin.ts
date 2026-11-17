@@ -38,7 +38,7 @@ self.addEventListener('install', event => event.waitUntil((async () => {
   const cache = await caches.open(CACHE);
   try {
     for (const file of FILES) {
-      const response = await fetch(href(file.path), {cache:'no-store'});
+      const response = await fetch(href(file.path === 'index.html' ? '' : file.path), {cache:'no-store'});
       if (!response.ok || response.redirected) throw Error('Failed asset: ' + file.path);
       const bytes = await response.clone().arrayBuffer();
       const sum = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(n=>n.toString(16).padStart(2,'0')).join('');
