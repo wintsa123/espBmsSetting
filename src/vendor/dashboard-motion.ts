@@ -114,7 +114,7 @@ export function bindDashboardMotion(phone: HTMLElement): () => void {
     }
   };
   const topbarObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(measureTop) : undefined;
-  if (topbar) topbarObserver?.observe(topbar);
+  if (topbar) topbarObserver?.observe(topbar, { box: "border-box" });
   measureTop();
   const schedule = () => {
     if (state.scrollFrame) return;

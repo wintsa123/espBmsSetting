@@ -1,3 +1,4 @@
+import Dropdown from "./Dropdown";
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 export type RideSession = {
@@ -118,7 +119,7 @@ export default function RideHistory({ sessions, language, load }: { sessions: Ri
   const time = (timestamp: number) => session?.calibrated ? new Date(timestamp * 1000).toLocaleString(en ? 'en-US' : 'zh-CN') : `${en ? 'Uncalibrated time' : '未校准时间'} · ${timestamp}s`;
   return <div className="ride-history">
     {!session ? <p className="empty">{en ? 'No driving history sessions' : '暂无行驶历史会话'}</p> : <>
-      <label>{en ? 'Session' : '行驶会话'}<select aria-label={en ? 'Session' : '行驶会话'} value={session.id} onChange={event => setSelected(Number(event.target.value))}>{sorted.map(item => <option key={item.id} value={item.id}>#{item.id} · {Math.floor(item.elapsed_s / 60)}m {item.elapsed_s % 60}s{!item.calibrated ? (en ? ' · Uncalibrated' : ' · 未校准') : ''}</option>)}</select></label>
+      <div className="stack"><span>{en ? 'Session' : '行驶会话'}</span><Dropdown label={en ? 'Session' : '行驶会话'} value={String(session.id)} onChange={value => setSelected(Number(value))} options={sorted.map(item => ({ value: String(item.id), label: `#${item.id} · ${Math.floor(item.elapsed_s / 60)}m ${item.elapsed_s % 60}s${!item.calibrated ? (en ? ' · Uncalibrated' : ' · 未校准') : ''}` }))} /></div>
       <p className="empty">{session.samples} {en ? 'recorded samples' : '条已记录样本'}{session.truncated ? (en ? ' · Truncated' : ' · 已截断') : ''}{session.capacity_reached ? (en ? ' · Capacity reached' : ' · 容量已满') : ''}</p>
       <section className="card"><h3>{en ? 'BMS history' : 'BMS 历史曲线'}</h3>
         <p className="empty">{shown.samples.rows.length} {en ? 'samples loaded · horizontal axis is elapsed seconds' : '条已加载样本 · 横轴为本次行驶秒数'}</p>

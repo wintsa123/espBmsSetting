@@ -1,3 +1,6 @@
+import Dropdown from "./Dropdown";
+import WebCast from "./WebCast";
+import WebNavigation from "./WebNavigation";
 import { DeviceControls, type Control } from "./DeviceControls";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { dashboardIcon, socBar } from "./vendor/dashboard-parts";
@@ -313,38 +316,23 @@ const STATE_LABELS: Record<string, keyof typeof I18N.zh> = {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-function CastLanding() {
-  const deepLink = `fuckingbms://cast/v1${window.location.search}`;
-  const english = new URLSearchParams(window.location.search).get("lang") === "en";
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => { window.location.href = deepLink; }, 150);
-    return () => window.clearTimeout(timer);
-  }, [deepLink]);
-
-  return (
-    <main className="cast-landing">
-      <p className="eyebrow">{english ? "BMS REMOTE CAST" : "BMS 远程投屏"}</p>
-      <h1>{english ? "Opening the casting app…" : "正在打开投屏 App…"}</h1>
-      <p>{english ? "The BMS casting app opens automatically when installed. Make sure the phone is connected to the device hotspot." : "已安装 BMS 投屏 App 时将自动打开。请确认手机已连接设备热点。"}</p>
-      <a className="cast-open" href={deepLink}>{english ? "Open BMS Casting App" : "打开 BMS 投屏 App"}</a>
-      <p className="cast-help">{english ? "If the app is not installed, install the APK and scan again." : "若未安装 App，请安装 APK 后重新扫码。"}</p>
-      <a className="cast-download" href="/apk/两轮智控.apk" download>{english ? "Download the latest APK" : "下载最新版 App"}</a>
-    </main>
-  );
-}
-
 export default function App() {
-  if (window.location.pathname === "/cast") return <CastLanding />;
-  const openCast = () => {
-    if (native?.openNative) native.openNative("CAST");
-    else setMessage(language === "zh" ? "请在 Android App 中使用投屏" : "Open the Android app to cast");
-  };
+  const native = window.BmsNative;
+  const castLanding = window.location.pathname === "/cast" || new URLSearchParams(window.location.search).get("cast") === "1";
+  const [webFeature, setWebFeature] = useState<"cast" | "navigation" | null>(castLanding ? "cast" : null);
+  const [deviceLanguage, setLanguage] = useState<Language>(castLanding && new URLSearchParams(window.location.search).get("lang") === "en" ? "en" : "zh");
+  const [webLanguage, setWebLanguage] = useState<Language>();
+  const language = webLanguage ?? deviceLanguage;
+  const zh = language === "zh";
+  const castParams = new URLSearchParams(castLanding ? window.location.search : "v=1");
+  castParams.set("host", "192.168.4.1");
+  castParams.set("lang", language);
+  const openCast = () => setWebFeature("cast");
   const openCompanion = (page: "music" | "navigation" | "settings") => {
     if (native?.openCompanion) native.openCompanion(page, language);
-    else setMessage(language === "zh" ? "请使用新版 Android App 打开音乐与导航" : "Open music and navigation in the updated Android app");
+    else if (page !== "music") setWebFeature("navigation");
+    else setMessage(zh ? "请使用新版 Android App 打开音乐与导航" : "Open music and navigation in the updated Android app");
   };
-  const [language, setLanguage] = useState<Language>("zh");
   const [transport, setTransport] = useState<Transport>("http");
   const [tab, setTab] = useState<Tab>("overview");
   const [homeEditing, setHomeEditing] = useState(false);
@@ -365,7 +353,8 @@ export default function App() {
         versionCode: typeof info?.versionCode === "number" ? info.versionCode : undefined };
     } catch { return {}; }
   });
-  const [baseUrl, setBaseUrl] = useState("http://192.168.4.1");
+  const [deviceAddress, setDeviceAddress] = useState(castLanding ? new URLSearchParams(window.location.search).get("host") || "" : "");
+  const baseUrl = normalizeBaseUrl(deviceAddress);
   const [status, setStatus] = useState<Status>({});
   const [config, setConfig] = useState<Config>({
     language: "zh",
@@ -382,7 +371,6 @@ export default function App() {
   const [connections, setConnections] = useState<Record<Transport, boolean>>({ ble: false, http: false });
   const connected = connections[transport];
   const rideData = useRideData(sessions, connected, transport === "http", `${transport}:${baseUrl}`, api);
-  const native = window.BmsNative;
   const phoneRef = useRef<HTMLDivElement>(null);
   const [clock, setClock] = useState(() => new Date());
   useEffect(() => {
@@ -463,6 +451,7 @@ export default function App() {
       for (const request of pending.values()) { window.clearTimeout(request.timer); request.reject(new Error("Page closed")); }
       delete window.__bmsNativeReply;
       delete window.bmsNativeRequest;
+      delete window.bmsConnectionSettingsClosed;
     };
   }, [native]);
 
@@ -639,11 +628,21 @@ export default function App() {
     pending.resolve(message.body);
   }
 
+  function openConnectionSettings(kind: Transport) {
+    const connect = kind === "http" ? connectHttp : connectBle;
+    if (!native?.openConnectionSettings) { void connect(); return; }
+    window.bmsConnectionSettingsClosed = () => {
+      delete window.bmsConnectionSettingsClosed;
+      void connect();
+    };
+    native.openConnectionSettings(kind);
+  }
+
   async function connectHttp() {
     await run("", async () => {
       setCurrentTransport("http");
-      await loadManifest();
       await refresh();
+      await loadManifest();
     });
   }
 
@@ -651,10 +650,12 @@ export default function App() {
     await run("", async () => {
       if (native) {
         native.connectBle();
-        const deadline = Date.now() + 60000;
+        const deadline = Date.now() + 20000;
         while (!native.bleConnected()) {
-          if (Date.now() > deadline) throw new Error(t("disconnected"));
-          await new Promise((resolve) => window.setTimeout(resolve, 500));
+          await new Promise((resolve) => window.setTimeout(resolve, 250));
+          const state = JSON.parse(native.getBleState?.() || "{}");
+          if (state.error || state.state === "ERROR") throw new Error(state.error || t("disconnected"));
+          if (Date.now() > deadline) throw new Error(zh ? "未找到面板蓝牙，请确认面板已开机后重试" : "Panel Bluetooth not found. Check the panel and retry.");
         }
         setCurrentTransport("ble");
         await loadManifest();
@@ -956,15 +957,20 @@ export default function App() {
           { id: "settings-update-title", title: language === "zh" ? "更新管理" : "Updates", content: <button className="card home-shortcut quiet" onClick={() => openSetting("settings-update-title")}><DashboardIcon name="gear" /><strong>{language === "zh" ? "更新管理" : "Updates"}</strong></button> },
 
           { id: "companion-music", title: language === "zh" ? "音乐与歌词" : "Music & lyrics", content: <button className="card home-shortcut quiet" onClick={() => openCompanion("music")}><span aria-hidden="true" className="companion-symbol">♪</span><strong>{language === "zh" ? "音乐与歌词" : "Music & lyrics"}</strong><small>{language === "zh" ? "手机同步到设备" : "Sync to display"}</small></button> },
-          { id: "companion-navigation", title: language === "zh" ? "实时导航" : "Navigation", content: <button className="card home-shortcut quiet" onClick={() => openCompanion("navigation")}><DashboardIcon name="route" /><strong>{language === "zh" ? "实时导航" : "Navigation"}</strong><small>{language === "zh" ? "本地导航 · 天地图" : "Local guidance · Tianditu"}</small></button> },
+          { id: "companion-navigation", title: language === "zh" ? "实时导航" : "Navigation", content: <button className="card home-shortcut quiet" onClick={() => openCompanion("navigation")}><DashboardIcon name="route" /><strong>{language === "zh" ? "实时导航" : "Navigation"}</strong><small>{zh ? (native ? "本地导航 · 天地图" : "骑行路线与转向提示") : (native ? "Local guidance · Tianditu" : "Cycling route and guidance")}</small></button> },
           { id: "cast", title: t("cast"), initial: true, content: <button className="card home-shortcut quiet" onClick={openCast}><DashboardIcon name="gauge" /><strong>{t("cast")}</strong></button> },
         ]} />
       </section>
 
       <section className={tab === "rides" ? "panel page active" : "panel page"} aria-label={language === "zh" ? "功能" : "Features"}>
         <article className="card companion-card">
-          <div className="card-head"><span className="companion-symbol" aria-hidden="true">↗</span><div><h2 className="card-title">{language === "zh" ? "一路有声" : "Soundtrack your ride"}</h2><p className="card-sub">{language === "zh" ? "歌词随行，导航随心。手机计算，设备呈现。" : "Live lyrics and local navigation on your display."}</p></div></div>
-          <div className="companion-actions"><button className="btn tonal" onClick={() => openCompanion("music")}>♪　{language === "zh" ? "音乐与歌词" : "Music & lyrics"}</button><button className="btn tonal" onClick={() => openCompanion("navigation")}>↗　{language === "zh" ? "实时导航" : "Navigate"}</button></div>
+          <div className="card-head"><DashboardIcon name="route" /><h2 className="card-title">{zh ? "投屏与骑行导航" : "Casting and cycling navigation"}</h2></div>
+          <div className="companion-actions">
+            <button className="btn tonal" onClick={openCast}>{t("cast")}</button>
+            <button className="btn tonal" onClick={() => openCompanion("navigation")}>{zh ? "骑行导航" : "Cycling navigation"}</button>
+            {native && <button className="btn tonal" onClick={() => openCompanion("music")}>{zh ? "音乐与歌词" : "Music & lyrics"}</button>}
+            {native && <button className="btn tonal" onClick={() => openCompanion("settings")}>{zh ? "同步与地图设置" : "Sync & map settings"}</button>}
+          </div>
         </article>
         <DeviceControls key={`${transport}:${baseUrl}`} language={language} connected={connected} request={api} onBusy={setBusy} onCatalog={setRemoteCards} focusId={tab === "rides" ? focusControl : ""} onNotify={setMessage} http={transport === "http"} status={{ ...status }} connectionTarget={connectionTarget} onConnectionClose={() => setConnectionTarget(null)} onConnectionSaved={refresh} />
       </section>
@@ -972,14 +978,22 @@ export default function App() {
       <section className={tab === "device" ? "panel page active" : "panel page"} aria-label={language === "zh" ? "设置" : "Settings"}>
         <section className="card stack" aria-labelledby="settings-connection-title">
           <div className="card-head"><DashboardIcon name="link" /><h2 className="card-title" id="settings-connection-title">{language === "zh" ? "连接 ESP32 面板" : "Connect to ESP32"}</h2></div>
-          <p className="card-sub">{language === "zh" ? "先在系统中连接面板热点或同一局域网，再填写设备地址。蓝牙连接使用当前电脑或手机的蓝牙。" : "Connect to the panel hotspot or the same LAN in system settings, then enter its address. Bluetooth uses this computer or phone."}</p>
-          <form className="stack" onSubmit={event => { event.preventDefault(); void connectHttp(); }}>
-            <label><span>{t("deviceAddress")}</span><input type="url" required value={baseUrl} disabled={busy} placeholder="http://192.168.4.1" onChange={event => setBaseUrl(event.target.value)} /></label>
-            <div className="button-row"><button type="submit" className="btn tonal" disabled={busy}>{language === "zh" ? "连接 Wi-Fi 设备" : "Connect over Wi-Fi"}</button><button type="button" className="btn tonal" disabled={busy} onClick={() => void connectBle()}>{language === "zh" ? "连接面板蓝牙" : "Connect panel Bluetooth"}</button></div>
+          <p className="card-sub">{native?.openConnectionSettings ? (zh ? "在系统设置连接面板后返回 App。" : "Connect the panel in system settings and return to the app.") : (zh ? "先在系统中连接面板热点，再点 Wi-Fi 连接。" : "Join the panel hotspot in system settings, then connect over Wi-Fi.")}</p>
+          <form className="stack" onSubmit={event => { event.preventDefault(); openConnectionSettings("http"); }}>
+            <div className="button-row"><button type="submit" className="btn tonal" disabled={busy}>{language === "zh" ? "连接 Wi-Fi 设备" : "Connect over Wi-Fi"}</button><button type="button" className="btn tonal" disabled={busy} onClick={() => openConnectionSettings("ble")}>{language === "zh" ? "连接面板蓝牙" : "Connect panel Bluetooth"}</button></div>
+            <details className="web-feature-options">
+              <summary>{zh ? "自定义局域网地址" : "Custom LAN address"}</summary>
+              <label>{t("deviceAddress")}<input type="url" value={deviceAddress} disabled={busy} placeholder="http://192.168.4.1" onChange={event => {
+                setDeviceAddress(event.target.value);
+                if (normalizeBaseUrl(event.target.value) !== baseUrl && connections.http) {
+                  setConnections(current => ({ ...current, http: false }));
+                  if (transport === "http") { setStatus({}); setManifest(undefined); setSessions([]); setRideRecords([]); setHistoryAvailable(false); }
+                }
+              }} /></label>
+            </details>
           </form>
         </section>
-        <section className="card stack" aria-labelledby="settings-cast-title"><div className="card-head"><DashboardIcon name="gauge" /><h2 className="card-title" id="settings-cast-title">{t("cast")}</h2></div><p className="card-sub">{language === "zh" ? "将手机画面投到设备屏幕，连接设备热点后即可开始。" : "Mirror your phone to the device screen after connecting to its hotspot."}</p><button className="btn tonal" onClick={openCast}>{language === "zh" ? "投屏设置" : "Cast settings"}</button></section>
-        <section className="card stack"><div className="card-head"><DashboardIcon name="route" /><h2 className="card-title">{language === "zh" ? "音乐与导航" : "Music & navigation"}</h2></div><p className="card-sub">{language === "zh" ? "管理后台同步、播放器权限、地图 Key 和出行方式。" : "Manage background sync, media access, map keys, and vehicle type."}</p><button className="btn tonal" onClick={() => openCompanion("settings")}>{language === "zh" ? "同步与地图设置" : "Sync & map settings"}</button></section>
+        {!native && <section className="card stack" id="language"><h2 className="card-title">{zh ? "网页语言" : "Page language"}</h2><Dropdown label={zh ? "网页语言" : "Page language"} value={language} options={[{ value: "zh", label: "中文" }, { value: "en", label: "English" }]} onChange={value => setWebLanguage(value === "en" ? "en" : "zh")} /></section>}
         <section className="card stack settings-detail update-card" aria-labelledby="settings-update-title">
           <div className="card-head"><span className="muted"><DashboardIcon name="download" size={20} /></span><h2 className="card-title" id="settings-update-title">{language === "zh" ? "更新" : "Updates"}</h2></div>
         <ClientUpdateCards language={language} appInfo={appInfo} />
@@ -987,20 +1001,9 @@ export default function App() {
         {firmwareCheckError && <p className="empty" role="status">{firmwareCheckError}</p>}
         <div className="stack">
           <h2>{t("onlineFirmware")}</h2>
-          <div className="button-row">
-            <select
-              value={onlineFirmware?.profile || ""}
-              disabled={busy || onlineFirmwares.length === 0}
-              onChange={(event) => { setOnlineFirmware(onlineFirmwares.find(item => item.profile === event.target.value)); setFirmwareFile(undefined); setFirmwareCode(""); }}
-            >
-              <option value="">{onlineFirmwares.length === 0 ? t("noOnlineFirmware") : "—"}</option>
-              {onlineFirmwares.map((item) => (
-                <option key={item.profile} value={item.profile}>
-                  {`${item.name || item.profile}${item.version ? ` v${item.version}` : ""}${item.chip ? ` [${item.chip}]` : ""}`}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Dropdown label={t("onlineFirmware")} value={onlineFirmware?.profile || ""} disabled={busy || onlineFirmwares.length === 0}
+            onChange={value => { setOnlineFirmware(onlineFirmwares.find(item => item.profile === value)); setFirmwareFile(undefined); setFirmwareCode(""); }}
+            options={[{ value: "", label: onlineFirmwares.length === 0 ? t("noOnlineFirmware") : "—" }, ...onlineFirmwares.map(item => ({ value: item.profile, label: `${item.name || item.profile}${item.version ? ` v${item.version}` : ""}${item.chip ? ` [${item.chip}]` : ""}` }))]} />
           <button className="btn tonal" type="button" disabled={busy || !onlineFirmware} onClick={() => onlineFirmware && void pickOnlineFirmware(onlineFirmware.profile)}>{language === "zh" ? "下载所选固件" : "Download selected firmware"}</button>
           {firmwareFile && <p className="card-sub">{language === "zh" ? "已准备" : "Ready"} · {firmwareFile.name} · {(firmwareFile.size / 1024).toFixed(0)} KB</p>}
           <p className="card-sub">{language === "zh" ? "选择匹配硬件的固件后下载；刷写前仍需确认文件和验证码。" : "Download firmware matching your hardware, then confirm the file and verification code before flashing."}</p>
@@ -1033,6 +1036,10 @@ export default function App() {
         {deviceSheet === "bms" && <section className="card stack"><h2>{language === "zh" ? "保护板状态" : "BMS status"}</h2><div className="grid2"><Metric label={t("bms")} value={formatState(status.bms, t)} /><Metric label="SOC" value={`${soc ?? "—"}%`} /><Metric label={t("battery")} value={battery} /><Metric label={t("current")} value={formatDeciAmps(status.current_deci_amps)} /><Metric label={language === "zh" ? "电芯压差" : "Cell delta"} value={status.delta_cell_voltage_mv == null ? "—" : `${status.delta_cell_voltage_mv} mV`} /><Metric label={t("bmsCapacityEstimate")} value={formatBmsCapacityEstimate(status, t)} /></div><button className="btn tonal" onClick={() => openSetting("bms_type")}>{language === "zh" ? "保护板配置与绑定" : "BMS settings and binding"}</button></section>}
         {deviceSheet === "controller" && <section className="card stack"><h2>{language === "zh" ? "控制器状态" : "Controller status"}</h2><div className="grid2"><Metric label={language === "zh" ? "连接" : "Connection"} value={status.controller_online == null ? "—" : t(status.controller_online ? "connected" : "disconnected")} /><Metric label={t("power")} value={status.controller_power_w == null ? "—" : `${status.controller_power_w} W`} /><Metric label={language === "zh" ? "转速" : "RPM"} value={status.controller_rpm == null ? "—" : `${status.controller_rpm} rpm`} /><Metric label={language === "zh" ? "控制器温度" : "Controller temperature"} value={status.controller_temp_c == null ? "—" : `${status.controller_temp_c} °C`} /><Metric label={language === "zh" ? "电机温度" : "Motor temperature"} value={status.motor_temp_c == null ? "—" : `${status.motor_temp_c} °C`} /></div><button className="btn tonal" onClick={() => openSetting("controller_type")}>{language === "zh" ? "控制器配置与绑定" : "Controller settings and binding"}</button></section>}
         </div>
+      </DashboardSheet>
+      <DashboardSheet page open={webFeature !== null} title={webFeature === "cast" ? t("cast") : (zh ? "实时导航" : "Navigation")} closeLabel={zh ? "返回" : "Back"} onClose={() => setWebFeature(null)}>
+        {webFeature === "cast" && <WebCast zh={zh} origin={baseUrl} request={httpApi} appLink={`fuckingbms://cast/v1?${castParams}`} />}
+        {webFeature === "navigation" && <WebNavigation zh={zh} origin={baseUrl} request={httpApi} />}
       </DashboardSheet>
       {message && <div className="toast show" role="status">{message}</div>}
     </div>
@@ -1124,7 +1131,7 @@ function ManifestControl({ item, language, busy, value, candidates, onValue, onA
 }) {
   if (item.kind === "map") return loadTrack ? <TrackPreview load={loadTrack} language={language} disabled={busy} /> : null;
   if (item.kind === "range") return <label><span>{item.label[language]}: {value}</span><input name={item.id} type="range" min={item.min} max={item.max} step={item.step} value={value} onChange={(event) => onValue(event.target.value)} /></label>;
-  if (item.kind === "select") return <label><span>{item.label[language]}</span><select name={item.id} value={value} onChange={(event) => onValue(event.target.value)}>{item.options?.map((option) => <option key={option.value} value={option.value}>{option.label[language]}</option>)}</select></label>;
+  if (item.kind === "select") return <div className="connection-field"><span>{item.label[language]}</span><Dropdown label={item.label[language]} value={value} disabled={busy} onChange={onValue} options={item.options?.map(option => ({ value: option.value, label: option.label[language] })) ?? []} /></div>;
   if (item.kind === "action") return <button type="button" disabled={busy} onClick={onAction}>{item.label[language]}</button>;
   if (item.kind === "choice") return <><label><span>{item.label[language]}</span><input value={value} onChange={(event) => onValue(event.target.value)} /></label><div className="button-row"><button type="button" disabled={busy || !item.options_endpoint} onClick={onLoadChoices}>{language === "zh" ? "刷新列表" : "Refresh list"}</button><button className="secondary" type="button" disabled={busy || !value} onClick={onSubmitChoice}>{language === "zh" ? "绑定" : "Bind"}</button></div><CandidateList candidates={candidates} emptyLabel={language === "zh" ? "暂无候选设备" : "No devices found"} onPick={onValue} /></>;
   return null;

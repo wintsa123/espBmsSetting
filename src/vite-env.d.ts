@@ -54,9 +54,15 @@ interface Window {
     request: (id: string, method: string, path: string, body: string, host: string) => void;
     connectBle: () => void;
     bleConnected: () => boolean;
-    openNative: (route: string) => void;
+    getBleState?: () => string;
+    startCast?: (host: string) => void;
+    stopCast?: () => void;
+    getCastState?: () => string;
+    getAppUpdateState?: () => string;
+    openConnectionSettings?: (kind: "http" | "ble") => void;
     openCompanion?: (page: string, language: string) => void;
   };
+  bmsConnectionSettingsClosed?: () => void;
   __bmsNativeReply?: (id: string, payload: string) => void;
   bmsNativeRequest?: (method: string, path: string, body: string, host: string) => Promise<unknown>;
 }

@@ -72,7 +72,10 @@ export default function DashboardSheet({ open, title, subtitle, closeLabel = "å…
     locked.forEach(({ node }) => node.style.setProperty("overflow", "hidden"));
     const focusables = () => Array.from(sheet.querySelectorAll<HTMLElement>(focusableSelector)).filter(node => node.tabIndex >= 0 && !node.closest("[inert]") && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden");
     const keydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeRef.current(); }
+      if (event.key === "Escape") {
+        if (event.target instanceof Element && event.target.closest('[data-dropdown-open="true"]')) return;
+        event.preventDefault(); event.stopPropagation(); closeRef.current();
+      }
       if (event.key !== "Tab") return;
       const items = focusables();
       const first = items[0];

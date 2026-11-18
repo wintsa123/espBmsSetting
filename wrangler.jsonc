@@ -1,9 +1,15 @@
 {
   "name": "fuckbms",
+  "main": "./tools/amap-worker.ts",
   "compatibility_date": "2026-11-01",
   "assets": {
     "directory": "./dist",
-    "html_handling": "auto-trailing-slash"
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": [
+      "/_AMapService/*",
+      "/web/*/index.html"
+    ],
+    "binding": "ASSETS"
   },
   "routes": [
     {

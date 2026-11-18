@@ -5,11 +5,8 @@
 .connection-intro p { margin: 5px 0 0; font-size: 12px; line-height: 1.6; color: var(--md-sys-color-on-surface-variant); }
 .connection-form { display: grid; gap: 18px; min-width: 0; }
 .connection-field { display: grid; gap: 8px; min-width: 0; font-size: 12px; color: var(--md-sys-color-on-surface-variant); }
-.connection-select { display: flex; position: relative; align-items: center; }
-.connection-select select, .connection-field input { width: 100%; min-width: 0; min-height: 50px; box-sizing: border-box; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); padding: 12px 14px; font: inherit; font-size: 14px; }
-.connection-select select { appearance: none; padding-right: 38px; cursor: pointer; }
-.connection-select > span { position: absolute; right: 16px; pointer-events: none; font-size: 20px; }
-.connection-select select:focus-visible, .connection-field input:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px; }
+.connection-field input { width: 100%; min-width: 0; min-height: 50px; box-sizing: border-box; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); padding: 12px 14px; font: inherit; font-size: 14px; }
+.connection-field input:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px; }
 .connection-field input::placeholder { color: var(--md-sys-color-outline); font-size: 12px; }
 .connection-bluetooth { display: grid; gap: 14px; padding: 16px; border-radius: 22px; background: var(--md-sys-color-surface-container-low); min-width: 0; }
 .connection-section-title { display: flex; align-items: center; gap: 8px; font-size: 14px; }
