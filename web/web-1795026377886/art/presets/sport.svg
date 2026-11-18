@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480" role="img" aria-labelledby="title desc"><title id="title">运动踏板 / Sport scooter</title><desc id="desc">原创锐角整流罩运动电动踏板车插图，橙色车身与烟灰风挡。</desc><defs><linearGradient id="sport-paint" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#ffd18a"/><stop offset=".5" stop-color="#ed8e42"/><stop offset="1" stop-color="#ed8e42"/></linearGradient><linearGradient id="sport-rim" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e4edf0"/><stop offset="1" stop-color="#71828e"/></linearGradient><linearGradient id="sport-seat" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#3c4954"/><stop offset="1" stop-color="#18232c"/></linearGradient><linearGradient id="sport-metal" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#596b78"/><stop offset=".45" stop-color="#c5d4dc"/><stop offset="1" stop-color="#697e8b"/></linearGradient></defs><ellipse cx="399" cy="416" rx="304" ry="13" fill="#152737" opacity=".12"/><g transform="translate(179 347)"><circle r="67" fill="#19232c"/><circle r="60" fill="#28333d"/><circle r="54" fill="#111b24"/><circle r="48" fill="url(#sport-rim)"/><g stroke="#657581" stroke-width="7" stroke-linecap="round"><path d="M0 -35V35M-31 -18L31 18M-31 18L31 -18"/></g><circle r="16" fill="#293b47"/><circle r="7" fill="#dce6eb"/><path d="M-36 -38A53 53 0 0 1 35 -39" fill="none" stroke="#69747d" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"/></g><g transform="translate(624 347)"><circle r="67" fill="#19232c"/><circle r="60" fill="#28333d"/><circle r="54" fill="#111b24"/><circle r="48" fill="url(#sport-rim)"/><g stroke="#657581" stroke-width="7" stroke-linecap="round"><path d="M0 -35V35M-31 -18L31 18M-31 18L31 -18"/></g><circle r="16" fill="#293b47"/><circle r="7" fill="#dce6eb"/><path d="M-36 -38A53 53 0 0 1 35 -39" fill="none" stroke="#69747d" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"/></g>
+<path d="M179 347L338 310L455 324L622 347" fill="none" stroke="#35454f" stroke-width="21" stroke-linecap="round"/>
+<path d="M231 269L245 330" stroke="#b4c6ce" stroke-width="12"/><path d="M231 269L242 321" stroke="#e4873c" stroke-width="16" stroke-dasharray="3 5"/>
+<path d="M123 272L166 239L276 237L366 274L419 283L461 245L493 157L532 150L578 197L611 270L661 300L654 317L608 305L555 325L447 337L356 325L280 292L162 290L135 305Z" fill="url(#sport-paint)" stroke="#7d3e24" stroke-width="3" stroke-linejoin="round"/>
+<path d="M149 263L260 254L332 279L285 287L169 280Z" fill="#ffd396"/>
+<path d="M312 282L369 296L422 302L467 278L487 282L455 320L361 311Z" fill="#23323c"/>
+<path d="M498 167L531 162L566 202L541 260L506 284L475 280L496 239Z" fill="#172d39"/>
+<path d="M506 175L525 172L551 202L527 245L506 254L518 216Z" fill="#738c99"/>
+<path d="M548 246L572 208L597 264L626 284L589 290Z" fill="#ffc17b"/>
+<path d="M563 250L585 243L600 269L582 273Z" fill="#ecfcff"/>
+<path d="M158 231L190 214L270 214L296 223L340 228L351 243L285 250L252 238L168 244Z" fill="url(#sport-seat)"/>
+<path d="M180 223L268 224L287 233" fill="none" stroke="#83909a" stroke-width="2"/>
+<path d="M497 160L498 119L530 109L553 149L532 150Z" fill="#587986" opacity=".7" stroke="#324f5c" stroke-width="3"/>
+<path d="M507 163L476 144L454 147" fill="none" stroke="#263c49" stroke-width="11" stroke-linecap="round"/>
+<path d="M477 145L458 116" stroke="#7c8e98" stroke-width="4"/><path d="M437 106L461 104L469 115L449 124L435 117Z" fill="#243a46"/>
+<path d="M566 254L622 346" stroke="url(#sport-metal)" stroke-width="12"/><path d="M573 263L609 321" stroke="#233c47" stroke-width="18"/>
+<path d="M581 306Q620 276 656 307" fill="none" stroke="#f08c40" stroke-width="10" stroke-linecap="round"/>
+<path d="M126 269L154 263L151 277L131 283Z" fill="#e95c53"/><path d="M206 279L254 276" stroke="#8a4a2b" stroke-width="5" stroke-linecap="round"/>
+<path d="M300 310L360 327L330 344L266 335Z" fill="#394c59"/><path d="M467 336L444 378" stroke="#344955" stroke-width="7" stroke-linecap="round"/>
+</svg>
