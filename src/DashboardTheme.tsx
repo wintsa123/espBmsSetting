@@ -49,9 +49,14 @@ export function ThemeButton({ language = 'zh' }: { language?: 'zh' | 'en' }) {
   const active = draft ? { ...preferences, accent: 'custom', customColors: draft } : preferences;
 
   useEffect(() => {
-    T.apply(active);
     const query = matchMedia('(prefers-color-scheme: light)');
-    const update = () => { setSystemLight(query.matches); T.apply(active); };
+    const update = () => {
+      setSystemLight(query.matches);
+      const colors = T.apply(active);
+      const light = document.documentElement.dataset.theme === 'light';
+      window.BmsNative?.setSystemBars?.(light ? colors['surface-container'] : colors.surface, light);
+    };
+    update();
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, [preferences, draft]);

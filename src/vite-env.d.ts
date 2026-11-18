@@ -45,6 +45,7 @@ interface RequestInit {
 interface Window {
   BmsNative?: {
     getAppInfo?: () => string;
+    setSystemBars?: (color: string, light: boolean) => void;
     getWebUpdateState?: () => string;
     checkWebUpdate?: () => void;
     checkWebUpdateFrom?: (source: "cf" | "github") => void;
