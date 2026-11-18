@@ -1,9 +1,9 @@
 {
-  "versionCode": 5,
-  "versionName": "0.4.1",
+  "versionCode": 7,
+  "versionName": "0.4.3",
   "url": "/apk/两轮智控.apk",
-  "size": 4253996,
-  "note": "投屏与骑行导航移到功能页；连接面板按钮打开 Android Wi-Fi 或蓝牙设置。",
-  "publishedAt": "2026-11-18T11:16:09+08:00",
-  "sha256": "79c416ea3d73299faf08a79932c3f62b532d5fbd23c4141b7098ff06fb88d061"
+  "size": 4514321,
+  "note": "统一新版投屏界面，修复连接设置返回后持续刷新、更新链路多余关闭按钮和状态栏安全区重叠",
+  "publishedAt": "2026-11-19T02:19:40+08:00",
+  "sha256": "b3632097fdc54ac71c138d9900a551027e7f7a842ad1c55da8a4cab5abed2a12"
 }
